@@ -1,9 +1,7 @@
-Version 23 — Remaining houses filter.
+Version 24 — Territory Card / Live Map toggle.
 
-- Remaining now works.
-- First tap: shows only buildings that have NOT been marked Worked.
-- Worked buildings are hidden from the house layer.
-- Button changes to All Houses while the filter is active.
-- Tap All Houses to restore every building.
-- If houses were off, tapping Remaining turns houses on and applies the filter.
-- House status records remain unchanged.
+- Territory Card button now switches to a full, opaque view of the original card.
+- The card is fit to the map viewport so the card is actually readable.
+- While the card is displayed, the button changes to Live Map.
+- Tapping Live Map removes the card and restores the previous live-map center/zoom.
+- The card is no longer shown as a faint transparent overlay over the live map.

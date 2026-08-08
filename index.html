@@ -823,10 +823,45 @@ $('locate').addEventListener('click',()=>map.locate({setView:true,maxZoom:18,ena
 map.on('locationfound',e=>L.circleMarker(e.latlng,{radius:8,color:'#fff',weight:3,fillColor:'#007aff',fillOpacity:1}).addTo(map).bindPopup('You are here').openPopup());
 
 let cardOverlay=null;
+let cardMode=false;
+let savedMapView=null;
+const cardBounds=[[39.946,-79.907],[39.982,-79.842]];
+
+function enterCardMode(){
+  if(cardMode)return;
+  cardMode=true;
+  savedMapView={center:map.getCenter(),zoom:map.getZoom()};
+  // Show the original territory card as an opaque card, not as a faded overlay.
+  cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',cardBounds,{
+    opacity:1,
+    interactive:false,
+    zIndex:1000
+  }).addTo(map);
+  cardOverlay.bringToFront();
+  map.fitBounds(cardBounds,{padding:[8,8]});
+  $('card').textContent='🗺️ Live Map';
+  banner('TERRITORY CARD');
+}
+
+function enterLiveMapMode(){
+  if(!cardMode)return;
+  cardMode=false;
+  if(cardOverlay){
+    map.removeLayer(cardOverlay);
+    cardOverlay=null;
+  }
+  $('card').textContent='🗺️ Territory Card';
+  banner('');
+  if(savedMapView){
+    map.setView(savedMapView.center,savedMapView.zoom,{animate:false});
+    savedMapView=null;
+  }
+  if(housesVisible&&!editMode)loadHouses();
+}
+
 $('card').addEventListener('click',()=>{
- if(cardOverlay){map.removeLayer(cardOverlay);cardOverlay=null;banner('');return}
- cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',[[39.946,-79.907],[39.982,-79.842]],{opacity:.42}).addTo(map);
- banner('TERRITORY CARD ON — visual reference only');
+  if(cardMode) enterLiveMapMode();
+  else enterCardMode();
 });
 
 map.on('moveend',()=>{if(housesVisible&&!editMode)loadHouses()});
