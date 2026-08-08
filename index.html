@@ -14,7 +14,7 @@
 #map{flex:1;min-height:0}.bottom{background:#fff;padding:9px 9px calc(9px + env(safe-area-inset-bottom));box-shadow:0 -2px 12px #0002;z-index:10}
 .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.actions button{border:0;border-radius:10px;padding:10px 4px;font-weight:700;background:#e5e5ea}.actions .blue{background:#007aff;color:#fff}
 .legend{text-align:center;color:#666;font-size:10px;margin-top:7px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 7px;vertical-align:-1px}
-#editor,#houseSheet{display:none;position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px #0003;padding:16px;z-index:40}
+#editor,#houseSheet{display:none;position:fixed;left:10px;right:10px;top:82px;bottom:auto;background:#fff;border-radius:16px;box-shadow:0 4px 20px #0004;padding:14px;z-index:1000;max-height:48vh;overflow:auto}
 .show{display:block!important}.editorBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.editorBtns button,.roadBtns button{border:0;border-radius:10px;padding:11px 5px;font-weight:700;background:#e5e5ea}.editorBtns .active,.roadBtns .primary{background:#007aff;color:#fff}
 .roadControls{display:none;margin-top:10px;padding:10px;background:#f2f2f7;border-radius:12px}.roadBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
 .small{font-size:12px;color:#666}.sheetTitle{font-size:19px;font-weight:700}.statuses{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:12px 0}.statuses button{border:0;border-radius:10px;padding:10px 3px;font-weight:700}
@@ -61,7 +61,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <button id="cancelEdit">Cancel</button>
 </div>
 <div id="roadControls" class="roadControls">
-<div class="small">Tap the starting road, then tap the intersection where this boundary segment should end.</div>
+<div class="small">Tap the starting road, then tap the intersection where this boundary segment should end. The segment is only previewed until you press Add Road Segment.</div>
 <div id="roadName" style="font-weight:700;font-size:13px;margin-top:5px">Ready.</div>
 <div class="roadBtns">
 <button id="roadAdd" class="primary">Add Road Segment</button>
@@ -133,7 +133,7 @@ function startEdit(target){
  $('editor').classList.add('show');
  $('dnwChooser').style.display=target==='territory'?'none':'block';
  $('editorTitle').textContent=target==='territory'?'Edit Territory':target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale';
- $('editorHelp').textContent='Drag a handle to fine-tune. Use Add Point or Follow Road to build the boundary.';
+ $('editorHelp').textContent='Drag a handle to fine-tune. Add Point inserts a corner where you tap. Follow Road replaces a short existing boundary section with the actual road path between two boundary corners.';
  $('freehand').classList.add('active'); $('followRoad').classList.remove('active');
  makeHandles(); banner('EDITING '+$('editorTitle').textContent.toUpperCase());
 }
@@ -208,8 +208,11 @@ async function snapPoint(lat,lng){
  return {lat:j.waypoints[0].location[1],lng:j.waypoints[0].location[0]};
 }
 async function routeSegment(a,b){
- const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson`);
- if(!r.ok)throw Error();const j=await r.json();if(j.code!=='Ok'||!j.routes?.length)throw Error();return j.routes[0];
+ const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson&steps=true`);
+ if(!r.ok)throw Error();
+ const j=await r.json();
+ if(j.code!=='Ok'||!j.routes?.length)throw Error();
+ return j.routes[0];
 }
 async function roadLabel(lat,lng){
  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`);const j=await r.json();return j.address?.road||''}catch(e){return ''}
@@ -218,24 +221,111 @@ async function handleRoadClick(ll){
  try{
   const p=await snapPoint(ll.lat,ll.lng);
   if(!roadStart){
-   roadStart=p;const n=await roadLabel(p.lat,p.lng);$('roadName').textContent=n?`Starting road: ${n}`:'Starting road selected';banner('FOLLOW ROAD: TAP THE END / INTERSECTION');return;
+   roadStart=p;
+   const n=await roadLabel(p.lat,p.lng);
+   $('roadName').textContent=n?`Starting road: ${n}`:'Starting road selected';
+   banner('FOLLOW ROAD: TAP THE END / INTERSECTION');
+   return;
   }
-  const route=await routeSegment(roadStart,p),coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
+  const route=await routeSegment(roadStart,p);
+  // Reject obviously bad routes; the user is drawing a local territory boundary,
+  // so a very long detour is almost certainly a wrong road choice.
+  if(route.distance>5000){
+   $('roadName').textContent='That route is too long for a boundary segment. Tap a closer intersection.';
+   return;
+  }
+  const coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
   if(roadPreview)map.removeLayer(roadPreview);
   roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.85,dashArray:'10 7'}).addTo(map);
-  pendingRoad={start:roadStart,end:p,coords};
-  const n=await roadLabel(roadStart.lat,roadStart.lng);$('roadName').textContent=n?`Preview: ${n} • ${Math.round(route.distance)} m`:`Road preview • ${Math.round(route.distance)} m`;
+  pendingRoad={start:roadStart,end:p,coords,distance:route.distance};
+  const n=await roadLabel(roadStart.lat,roadStart.lng);
+  $('roadName').textContent=n?`Preview: ${n} • ${Math.round(route.distance)} m`:`Road preview • ${Math.round(route.distance)} m`;
   banner('ROAD PREVIEW — TAP ADD ROAD SEGMENT');
- }catch(e){$('roadName').textContent='Could not find a road there. Tap directly on a road.'}
+ }catch(e){
+  $('roadName').textContent='Could not find a road there. Tap directly on a road.';
+ }
 }
 $('roadAdd').addEventListener('click',()=>{
  if(!pendingRoad)return;
  const arr=currentArray(),c=pendingRoad.coords;
- let vi=0,best=Infinity;arr.forEach((p,i)=>{const d=(p[0]-pendingRoad.start.lat)**2+(p[1]-pendingRoad.start.lng)**2;if(d<best){best=d;vi=i}});
- arr.splice(vi+1,0,...c);
- currentLayer().setLatLngs(arr);makeHandles();
+ if(c.length<2)return;
+
+ // Find the nearest existing boundary vertex to each end of the road segment.
+ function nearestVertex(point){
+   let best=Infinity,idx=0;
+   arr.forEach((p,i)=>{
+     const d=(p[0]-point.lat)**2+(p[1]-point.lng)**2;
+     if(d<best){best=d;idx=i}
+   });
+   return {idx,dist:Math.sqrt(best)};
+ }
+ const s=nearestVertex(pendingRoad.start), e=nearestVertex(pendingRoad.end);
+
+ // Only allow a road segment when both ends are reasonably close to the
+ // existing boundary. This prevents a segment from shooting away from the polygon.
+ if(s.dist>0.01 || e.dist>0.01){
+   $('roadName').textContent='Both ends must be near the existing boundary. Start closer to a boundary corner.';
+   return;
+ }
+
+ // Insert the road geometry between the two nearest boundary vertices.
+ // Reverse if needed so the path runs from s toward e.
+ let path=c.slice();
+ const ds=(path[0][0]-arr[s.idx][0])**2+(path[0][1]-arr[s.idx][1])**2;
+ const de=(path[path.length-1][0]-arr[s.idx][0])**2+(path[path.length-1][1]-arr[s.idx][1])**2;
+ if(de<ds)path.reverse();
+
+ // Replace the boundary portion between the two selected vertices.
+ const n=arr.length;
+ const forward=[];
+ let i=s.idx;
+ while(true){
+   forward.push(arr[i]);
+   if(i===e.idx)break;
+   i=(i+1)%n;
+   if(forward.length>n+1)break;
+ }
+ let replacement=path.slice();
+ if(forward.length>=2){
+   // Keep the road path as the new boundary section; omit duplicate endpoint.
+   replacement=replacement.slice(0,replacement.length);
+ }
+ // Build the polygon using the road path plus the boundary path in the opposite direction.
+ // Choose the shorter boundary arc to replace.
+ function arc(a,b){
+   const r=[];let k=a;
+   while(true){r.push(arr[k]);if(k===b)break;k=(k+1)%n;if(r.length>n+1)break}
+   return r;
+ }
+ const arc1=arc(s.idx,e.idx), arc2=arc(e.idx,s.idx);
+ const useArc1=arc1.length<=arc2.length;
+ const a=useArc1?s.idx:e.idx, b=useArc1?e.idx:s.idx;
+ let roadPath=path;
+ if(!useArc1)roadPath=roadPath.slice().reverse();
+
+ const result=[];
+ for(let k=0;k<=a;k++)result.push(arr[k]);
+ result.push(...roadPath.slice(1,-1));
+ for(let k=b;k<n;k++)result.push(arr[k]);
+
+ // If the chosen vertices wrap, use the simpler splice based on the arc selected.
+ if(useArc1){
+   const before=arr.slice(0,a+1);
+   const after=arr.slice(b);
+   territoryResult=before.concat(roadPath.slice(1,-1),after);
+ }else{
+   const before=arr.slice(0,a+1);
+   const after=arr.slice(b);
+   territoryResult=before.concat(roadPath.slice(1,-1),after);
+ }
+ if(territoryResult.length>=3){
+   if(editorTarget==='territory')territory=territoryResult;else dnw[Number(editorTarget.slice(3))]=territoryResult;
+   currentLayer().setLatLngs(territoryResult);
+   makeHandles();
+ }
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
- roadStart=null;pendingRoad=null;$('roadName').textContent='Segment added. Tap the next road start.';
+ roadStart=null;pendingRoad=null;
+ $('roadName').textContent='Segment added. Start at the next boundary corner.';
  banner('FOLLOW ROAD: TAP NEXT START');
 });
 
