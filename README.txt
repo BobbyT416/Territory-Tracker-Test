@@ -1,8 +1,13 @@
-Version 19 — permanent Do Not Work labels + Houses button state.
+Version 20 — single Do Not Work name + Houses action button.
 
-- Each Do Not Work area displays its saved name as a permanent label centered in the polygon.
-- Labels move/update when the polygon is edited or renamed.
-- Labels are removed/rebuilt correctly when areas are deleted or canceled.
-- Houses button now shows current state:
-  Houses ON when houses are visible.
-  Houses OFF when houses are hidden.
+Do Not Work:
+- There is one naming field: Name.
+- The dropdown is only for selecting an existing area.
+- The map shows only one permanent centered label for each Do Not Work area.
+- DNW polygons no longer use map tooltips, eliminating duplicate names.
+- Renaming updates the single centered label.
+
+Houses:
+- Button shows the action it will perform.
+- Houses visible -> button says Houses OFF.
+- Houses hidden -> button says Houses ON.

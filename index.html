@@ -30,7 +30,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 .dnw-center-label div{
   display:inline-block;
   transform:translate(-50%,-50%);
-  background:rgba(255,255,255,.78);
+  background:rgba(255,255,255,.82);
   border:1px solid rgba(160,120,0,.7);
   border-radius:5px;
   padding:3px 7px;
@@ -49,7 +49,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <div id="banner"></div><div id="map"></div>
 <div class="bottom">
 <div class="actions">
-<button id="houses" class="blue">🏠 Houses ON</button>
+<button id="houses" class="blue">🏠 Houses OFF</button>
 <button id="locate">📍 My Location</button>
 <button id="card">🗺️ Territory Card</button>
 <button id="editTerritory">✏️ Edit Territory</button>
@@ -69,8 +69,8 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <div class="sheetTitle" id="editorTitle">Edit Territory</div>
 <div class="small" id="editorHelp">EDITING ORDER: 1) Add Point at each intersection. 2) Follow Road. 3) Tap two blue points in order. 4) Review the blue road preview. 5) Tap Add Road Segment.</div>
 <div id="dnwChooser" style="display:none;margin-top:8px">
-<div class="small" style="margin-bottom:6px"><strong>Tip:</strong> tap a yellow area on the map first, or choose it below.</div><label class="small" for="dnwSelect">Do Not Work area</label>
-<select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px"></select><label class="small" for="dnwName" style="display:block;margin-top:7px">Area name</label>
+<div class="small" style="margin-bottom:6px"><strong>Tip:</strong> tap a yellow area on the map first, or choose it below.</div><label class="small" for="dnwSelect">Select Do Not Work area</label>
+<select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px"></select><label class="small" for="dnwName" style="display:block;margin-top:7px">Name</label>
 <input id="dnwName" type="text" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px" placeholder="e.g. Republic">
 <button id="saveDNWName" style="margin-top:7px">Save Area Name</button>
 </div>
@@ -212,8 +212,8 @@ function refreshDNWLabel(idx){
     icon:L.divIcon({
       className:'dnw-center-label',
       html:`<div>${escapeHtml(name)}</div>`,
-      iconSize:null,
-      iconAnchor:null
+      iconSize:[0,0],
+      iconAnchor:[0,0]
     })
   }).addTo(map);
 }
@@ -226,12 +226,12 @@ function ensureDNWLayer(idx){
   const layer=L.polygon(dnw[idx]||[],{
     color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48
   }).addTo(map);
-  layer.bindTooltip(dnwNames[idx]||`Do Not Work Area ${idx+1}`,{sticky:true});
+  layer;
   layer.on('click',()=>{
     if(editMode)return;
     activeDNWIndex=idx;
     dnwLayers.forEach((x,i)=>{if(x)x.setStyle({weight:i===idx?4:2,fillOpacity:i===idx?.60:.38})});
-    banner(`SELECTED: ${dnwNames[idx]||`Do Not Work Area ${idx+1}`} — tap Edit Do Not Work`);
+    banner('Do Not Work area selected — tap Edit Do Not Work');
   });
   dnwLayers[idx]=layer;
   refreshDNWLabel(idx);
@@ -384,7 +384,6 @@ $('saveDNWName').addEventListener('click',()=>{
   localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
   if(dnwLayers[activeDNWIndex]){
     dnwLayers[activeDNWIndex].unbindTooltip();
-    dnwLayers[activeDNWIndex].bindTooltip(name,{sticky:true});
   }
   refreshDNWLabel(activeDNWIndex);
   refreshDNWChooser();
@@ -445,7 +444,7 @@ $('deleteDNWArea').addEventListener('click',()=>{
   dnwLayers.forEach((layer,i)=>{
     if(layer){
       layer.unbindTooltip();
-      layer.bindTooltip(dnwNames[i]||`Do Not Work Area ${i+1}`,{sticky:true});
+      
       layer.setLatLngs(dnw[i]||[]);
       refreshDNWLabel(i);
     }
@@ -712,13 +711,20 @@ document.querySelectorAll('[data-status]').forEach(b=>b.addEventListener('click'
 $('saveNote').addEventListener('click',()=>{
  if(!houseCurrent)return;records[houseCurrent]={...(records[houseCurrent]||{}),note:$('houseNote').value};localStorage.setItem('tt_house_records_stable',JSON.stringify(records));$('houseSheet').classList.remove('show');
 });
+function updateHouseButton(){
+  $('houses').textContent=housesVisible?'🏠 Houses OFF':'🏠 Houses ON';
+  $('houses').classList.toggle('blue',housesVisible);
+}
 $('houses').addEventListener('click',()=>{
- housesVisible=!housesVisible;$('houses').textContent=housesVisible?'🏠 Houses ON':'🏠 Houses OFF';$('houses').classList.toggle('blue',housesVisible);loadHouses();
-});
-$('remaining').addEventListener('click',()=>{
- if(!housesVisible){housesVisible=true;$('houses').textContent='🏠 Houses ON';$('houses').classList.add('blue');}
+ housesVisible=!housesVisible;
+ updateHouseButton();
  loadHouses();
 });
+$('remaining').addEventListener('click',()=>{
+ if(!housesVisible){housesVisible=true;updateHouseButton();}
+ loadHouses();
+});
+updateHouseButton();
 $('locate').addEventListener('click',()=>map.locate({setView:true,maxZoom:18,enableHighAccuracy:true}));
 map.on('locationfound',e=>L.circleMarker(e.latlng,{radius:8,color:'#fff',weight:3,fillColor:'#007aff',fillOpacity:1}).addTo(map).bindPopup('You are here').openPopup());
 
