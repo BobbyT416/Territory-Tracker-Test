@@ -22,10 +22,11 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 #banner{display:none;position:absolute;top:86px;left:10px;right:10px;background:#fff;border-radius:12px;padding:9px;text-align:center;font-size:12px;font-weight:700;box-shadow:0 2px 10px #0003;z-index:25}
 
 .dnw-center-label{
-  background:transparent;
-  border:0;
-  text-align:center;
-  pointer-events:none;
+  background:transparent!important;
+  border:0!important;
+  width:0!important;
+  height:0!important;
+  pointer-events:none!important;
 }
 .dnw-center-label div{
   display:inline-block;
@@ -69,8 +70,8 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <div class="sheetTitle" id="editorTitle">Edit Territory</div>
 <div class="small" id="editorHelp">EDITING ORDER: 1) Add Point at each intersection. 2) Follow Road. 3) Tap two blue points in order. 4) Review the blue road preview. 5) Tap Add Road Segment.</div>
 <div id="dnwChooser" style="display:none;margin-top:8px">
-<div class="small" style="margin-bottom:6px"><strong>Tip:</strong> tap a yellow area on the map first, or choose it below.</div><label class="small" for="dnwSelect">Select Do Not Work area</label>
-<select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px"></select><label class="small" for="dnwName" style="display:block;margin-top:7px">Name</label>
+<div class="small" style="margin-bottom:6px">Select an existing area to edit.</div><label class="small" for="dnwSelect">Select Do Not Work area</label>
+<select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px"></select><label class="small" for="dnwName" style="display:block;margin-top:7px">Area name</label>
 <input id="dnwName" type="text" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px" placeholder="e.g. Republic">
 <button id="saveDNWName" style="margin-top:7px">Save Area Name</button>
 </div>
@@ -195,20 +196,25 @@ function currentLayer(){
 
 
 function polygonCenter(points){
-  if(!points || points.length===0) return null;
+  if(!points || !points.length) return null;
   let lat=0,lng=0;
   points.forEach(p=>{lat+=p[0];lng+=p[1]});
   return [lat/points.length,lng/points.length];
 }
 function refreshDNWLabel(idx){
-  if(dnwLabelLayers[idx]) map.removeLayer(dnwLabelLayers[idx]);
+  if(dnwLabelLayers[idx]) {
+    map.removeLayer(dnwLabelLayers[idx]);
+    dnwLabelLayers[idx]=null;
+  }
   const pts=dnw[idx]||[];
+  if(pts.length<3) return;
   const center=polygonCenter(pts);
-  if(!center || pts.length<3) return;
-  const name=dnwNames[idx]||`Do Not Work Area ${idx+1}`;
+  if(!center) return;
+  const name=(dnwNames[idx]||`Do Not Work Area ${idx+1}`).trim();
   dnwLabelLayers[idx]=L.marker(center,{
     interactive:false,
-    zIndexOffset:5000,
+    keyboard:false,
+    zIndexOffset:10000,
     icon:L.divIcon({
       className:'dnw-center-label',
       html:`<div>${escapeHtml(name)}</div>`,
@@ -382,9 +388,6 @@ $('saveDNWName').addEventListener('click',()=>{
   if(!name){banner('Enter a name first');return}
   dnwNames[activeDNWIndex]=name;
   localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
-  if(dnwLayers[activeDNWIndex]){
-    dnwLayers[activeDNWIndex].unbindTooltip();
-  }
   refreshDNWLabel(activeDNWIndex);
   refreshDNWChooser();
   $('dnwSelect').value='dnw'+activeDNWIndex;
@@ -443,7 +446,7 @@ $('deleteDNWArea').addEventListener('click',()=>{
 
   dnwLayers.forEach((layer,i)=>{
     if(layer){
-      layer.unbindTooltip();
+      layer;
       
       layer.setLatLngs(dnw[i]||[]);
       refreshDNWLabel(i);
@@ -712,8 +715,8 @@ $('saveNote').addEventListener('click',()=>{
  if(!houseCurrent)return;records[houseCurrent]={...(records[houseCurrent]||{}),note:$('houseNote').value};localStorage.setItem('tt_house_records_stable',JSON.stringify(records));$('houseSheet').classList.remove('show');
 });
 function updateHouseButton(){
-  $('houses').textContent=housesVisible?'🏠 Houses OFF':'🏠 Houses ON';
-  $('houses').classList.toggle('blue',housesVisible);
+  $('houses').textContent = housesVisible ? '🏠 Houses OFF' : '🏠 Houses ON';
+  $('houses').classList.toggle('blue', housesVisible);
 }
 $('houses').addEventListener('click',()=>{
  housesVisible=!housesVisible;

@@ -1,13 +1,13 @@
-Version 20 — single Do Not Work name + Houses action button.
+Version 21 — clean Do Not Work labels and Houses action button.
 
 Do Not Work:
-- There is one naming field: Name.
-- The dropdown is only for selecting an existing area.
-- The map shows only one permanent centered label for each Do Not Work area.
-- DNW polygons no longer use map tooltips, eliminating duplicate names.
+- The map has exactly ONE visible label per area.
+- The old polygon tooltip is removed completely.
+- The label is the saved Area Name and is centered in the polygon.
+- The dropdown is only for selecting an area; Area name is the only naming field.
 - Renaming updates the single centered label.
 
 Houses:
-- Button shows the action it will perform.
 - Houses visible -> button says Houses OFF.
 - Houses hidden -> button says Houses ON.
+- Button text tells the action that will happen when pressed.
