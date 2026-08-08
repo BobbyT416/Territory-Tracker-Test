@@ -70,6 +70,12 @@
 <div id="editor">
 <h2 id="editorTitle">Edit Territory</h2>
 <div class="small" id="editorHelp">Choose how you want to edit this boundary.</div>
+<div id="dnwChooser" style="display:none;margin-top:8px">
+<label for="dnwSelect" style="font-size:12px;font-weight:700">Do Not Work area</label>
+<select id="dnwSelect" style="width:100%;margin-top:4px;border:1px solid #ccc;border-radius:9px;padding:9px">
+<option value="dnw0">Republic</option><option value="dnw1">Cardale</option>
+</select>
+</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px">
 <button id="freehand" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#e5e5ea">✏️ Freehand</button>
 <button id="followRoad" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#007aff;color:#fff">🛣️ Follow Road</button>
@@ -138,10 +144,11 @@ function makeHandles(){
  });
 }
 function startEdit(target){
- if(roadMode) stopRoadMode();
+ if(roadTool) stopRoadTool();
  editorTarget=target; editMode=true; addMode=false; roadTool=false;
  originalGeom=JSON.parse(JSON.stringify({territory,dnw}));
  document.getElementById('editor').classList.add('show');
+ document.getElementById('dnwChooser').style.display=(target==='territory'?'none':'block');
  document.getElementById('roadControls').style.display='none';
  document.getElementById('freehand').style.background='#007aff';
  document.getElementById('freehand').style.color='#fff';
@@ -161,7 +168,7 @@ function stopEdit(save){
  if(save) localStorage.setItem('tt_geometry_v3',JSON.stringify({territory,dnw}));
  clearHandles();editMode=null;addMode=false;editorTarget='territory';originalGeom=null;
  stopRoadTool();
- document.getElementById('editor').classList.remove('show');banner('');
+ document.getElementById('editor').classList.remove('show');document.getElementById('dnwChooser').style.display='none';banner('');
 }
 function stopRoadTool(){
  roadTool=false;roadStart=null;pendingRoad=null;
@@ -169,7 +176,12 @@ function stopRoadTool(){
  document.getElementById('roadControls').style.display='none';
 }
 document.getElementById('edit').onclick=()=>startEdit('territory');
-document.getElementById('dnwEdit').onclick=()=>startEdit('dnw0');
+document.getElementById('dnwEdit').onclick=()=>{
+ if(roadTool) stopRoadTool();
+ document.getElementById('dnwChooser').style.display='block';
+ startEdit(document.getElementById('dnwSelect').value);
+};
+document.getElementById('dnwSelect')?.addEventListener('change',e=>{if(editMode)startEdit(e.target.value)});
 
 document.getElementById('freehand').onclick=()=>{
  stopRoadTool(); addMode=false; makeHandles();
