@@ -1,4 +1,11 @@
-Version 13 — offset boundary display.
+Version 15 — Do Not Work editor fix.
 
-The territory fill still uses the true boundary coordinates. The red boundary line is now drawn approximately 10 meters OUTSIDE the actual boundary, so street names and road centerlines remain visible.
-Editing points remain on the true boundary. Changes to the territory automatically refresh the offset red outline.
+Focused changes:
+- Do Not Work editor explicitly lets the user choose Republic or Cardale.
+- Blue edit handles are raised above map polygons and are easier to drag/select.
+- Selected points are highlighted.
+- Added Reset This Area for a clean starting shape if the current area is badly misplaced.
+- Editing instructions explain dragging, adding, and deleting points.
+- Normal Do Not Work styling is restored after closing the editor.
+
+The initial Do Not Work coordinates are still only a starting approximation; the editor is intended to let the user place them accurately against the actual territory card/map.

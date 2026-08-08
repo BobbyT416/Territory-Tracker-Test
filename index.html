@@ -58,6 +58,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <button id="addPoint">➕ Add Point</button>
 <button id="deleteSelected">🗑️ Delete Selected</button>
 <button id="deletePoint">➖ Delete Last</button>
+<button id="resetDNW">↩️ Reset This Area</button>
 <button id="saveEdit" class="active">Save Changes</button>
 <button id="cancelEdit">Cancel</button>
 </div>
@@ -155,7 +156,7 @@ function makeHandles(){
  if(!editMode)return;
  const arr=currentArray();
  arr.forEach((p,i)=>{
-   const h=L.marker(p,{draggable:true}).addTo(map);
+   const h=L.marker(p,{draggable:true,zIndexOffset:10000}).addTo(map);
    h._pointIndex=i;
    h.on('drag',e=>{
      arr[i]=[e.latlng.lat,e.latlng.lng];
@@ -192,7 +193,8 @@ function makeHandles(){
        handles.forEach(x=>x.setOpacity(.65));
        h.setOpacity(1);
        window.selectedFreehandIndex=i;
-       banner('POINT '+(i+1)+' SELECTED');
+       handles.forEach((x,j)=>x.setOpacity(j===i?1:.65));
+       banner('POINT '+(i+1)+' SELECTED — DRAG IT OR DELETE SELECTED');
      }
    });
    handles.push(h);
@@ -216,6 +218,9 @@ function startEdit(target){
  $('editor').classList.add('show');
  $('dnwChooser').style.display=target==='territory'?'none':'block';
  $('editorTitle').textContent=target==='territory'?'Edit Territory':target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale';
+ if(target!=='territory'){
+   dnwLayers.forEach((layer,i)=>layer.setStyle({fillOpacity:i===Number(target.slice(3))?.62:.18,weight:i===Number(target.slice(3))?3:1}));
+ }
  $('editorHelp').textContent='The red boundary line is displayed about 10 m outside the actual boundary so road names stay readable. Blue points remain on the true boundary.';
  $('freehand').classList.add('active'); $('followRoad').classList.remove('active');
  makeHandles(); banner('EDITING '+$('editorTitle').textContent.toUpperCase());
@@ -227,10 +232,16 @@ function closeEditor(save){
  }
  if(save)localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
  stopRoadMode();clearHandles();editMode=false;addMode=false;original=null;
- $('editor').classList.remove('show');$('dnwChooser').style.display='none';banner('');
+ $('editor').classList.remove('show');$('dnwChooser').style.display='none';
+ dnwLayers.forEach(layer=>layer.setStyle({color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}));
+ banner('');
 }
 $('editTerritory').addEventListener('click',()=>startEdit('territory'));
-$('editDNW').addEventListener('click',()=>startEdit($('dnwSelect').value));
+$('editDNW').addEventListener('click',()=>{
+  startEdit($('dnwSelect').value);
+  $('editorHelp').textContent='Do Not Work editing: drag the blue points to the correct locations. Use Add Point to add a corner. Delete Selected removes a selected point.';
+  banner('EDITING '+$('dnwSelect').options[$('dnwSelect').selectedIndex].text.toUpperCase());
+});
 $('dnwSelect').addEventListener('change',()=>{if(editMode)startEdit($('dnwSelect').value)});
 
 $('freehand').addEventListener('click',()=>{
