@@ -42,11 +42,108 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
   white-space:nowrap;
   text-shadow:0 1px 1px rgba(255,255,255,.7);
 }
+
+@media (max-width:600px){
+  body.editor-open .bottom{display:none!important}
+  body.editor-open #map{
+    bottom:0!important;
+  }
+  body.editor-open #editor{
+    top:auto!important;
+    bottom:0!important;
+    max-height:42dvh!important;
+    z-index:40000!important;
+  }
+}
+
+#syncSheet{
+ display:none;position:fixed;left:10px;right:10px;top:82px;bottom:auto;
+ background:#fff;border-radius:16px;box-shadow:0 4px 20px #0004;padding:14px;
+ z-index:45000;max-height:70vh;overflow:auto
+}
+#syncSheet.show{display:block!important}
+#syncSheet label{display:block;margin-top:8px}
+#syncSheet input{width:100%;box-sizing:border-box;margin-top:3px}
+@media(max-width:600px){
+  #syncSheet{
+    left:7px!important;right:7px!important;top:auto!important;
+    bottom:calc(7px + env(safe-area-inset-bottom))!important;
+    max-height:78dvh!important;padding:12px;border-radius:18px;
+  }
+}
+
+</style>
+
+<style id="iphone-layout-v28">
+@media (max-width:600px){
+  html,body{width:100%;height:100%;overflow:hidden}
+  .app{height:100dvh;min-height:100dvh;position:relative}
+  .header{
+    position:fixed!important;top:0;left:0;right:0;
+    height:58px;
+    padding:calc(env(safe-area-inset-top) + 5px) 10px 5px;
+    z-index:20000!important;
+    background:#fff;
+  }
+  .header h1{font-size:17px;line-height:20px}
+  .header p{font-size:10px;margin:1px 0 0}
+  #map{
+    position:fixed!important;
+    top:58px!important;left:0!important;right:0!important;
+    bottom:190px!important;height:auto!important;min-height:0!important;
+    z-index:1!important;
+  }
+  .bottom{
+    position:fixed!important;
+    left:0!important;right:0!important;bottom:0!important;
+    height:190px;
+    padding:6px 7px calc(6px + env(safe-area-inset-bottom));
+    box-sizing:border-box;
+    background:#fff;
+    border-top:1px solid #d1d1d6;
+    box-shadow:0 -3px 16px #0003;
+    z-index:20000!important;
+    overflow:hidden;
+  }
+  .actions{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    grid-auto-rows:44px;
+    gap:5px;
+  }
+  .actions button{
+    min-width:0;min-height:44px;padding:4px 2px;
+    border-radius:9px;font-size:11px;line-height:13px;font-weight:700;
+    touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  }
+  .legend{font-size:8px;margin-top:4px;white-space:nowrap;overflow:hidden}
+  #banner{
+    position:fixed!important;top:62px!important;left:7px!important;right:7px!important;
+    font-size:12px;padding:7px;z-index:25000!important;
+  }
+  #editor,#houseSheet{
+    position:fixed!important;left:7px!important;right:7px!important;
+    top:auto!important;bottom:calc(7px + env(safe-area-inset-bottom))!important;
+    max-height:84dvh!important;padding:12px;border-radius:18px;
+    z-index:30000!important;overflow:auto;-webkit-overflow-scrolling:touch;
+  }
+  #editor .sheetTitle,#houseSheet .sheetTitle{font-size:18px}
+  .editorBtns{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .editorBtns button,.roadBtns button{min-height:44px;padding:8px 4px;font-size:13px;touch-action:manipulation}
+  .roadControls{padding:8px}
+  .roadBtns{grid-template-columns:1fr;gap:6px}
+  .statuses{grid-template-columns:repeat(2,1fr);gap:7px}
+  .statuses button{min-height:48px;font-size:13px;touch-action:manipulation}
+  textarea{font-size:16px}
+  select,input{min-height:44px;font-size:16px!important}
+  .leaflet-control-zoom a{width:42px;height:42px;line-height:42px;font-size:22px}
+  .leaflet-control-attribution{font-size:8px}
+}
 </style>
 </head>
 <body>
 <div class="app">
-<header class="header"><h1>Territory Tracker</h1><p>Republic / Cardale — Stable Test</p></header>
+<header class="header"><h1>Territory Tracker</h1><p>Republic / Cardale</p></header>
 <div id="banner"></div><div id="map"></div>
 <div class="bottom">
 <div class="actions">
@@ -57,8 +154,17 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <button id="editDNW">🟨 Edit Do Not Work</button>
 <button id="addDNW">➕ Add Do Not Work Area</button>
 <button id="remaining" title="Show only houses not marked Worked">Remaining</button>
-<button id="exportData" type="button">💾 Export Map Data</button>
 </div>
+
+<div id="dataTransfer" style="margin-top:6px;display:flex;gap:5px;justify-content:center">
+<button id="exportData" type="button">💾 Export Map Data</button>
+<button id="cloudSync" type="button">☁️ Cloud Sync</button>
+<label for="importData" style="display:inline-block">
+  <span style="display:inline-block;background:#e5e5ea;border-radius:10px;padding:10px 8px;font-weight:700;cursor:pointer">📂 Import Map Data</span>
+  <input id="importData" type="file" accept=".json,application/json" style="display:none">
+</label>
+</div>
+
 <div class="legend">
 <span><i class="sw" style="background:#c7c7cc"></i>Unworked</span>
 <span><i class="sw" style="background:#34c759"></i>Worked</span>
@@ -66,6 +172,41 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <span><i class="sw" style="background:#007aff"></i>Return</span>
 </div>
 </div></div>
+
+
+<section id="syncSheet">
+  <div class="sheetTitle">☁️ Cloud Sync</div>
+  <div id="syncStatus" class="small">Not connected.</div>
+
+  <div id="syncSetup">
+    <label class="small">Supabase Project URL</label>
+    <input id="syncUrl" type="url" placeholder="https://your-project.supabase.co" autocomplete="off">
+    <label class="small">Publishable key</label>
+    <input id="syncKey" type="text" placeholder="sb_publishable_..." autocomplete="off">
+    <button class="save" id="syncConnect">Connect</button>
+  </div>
+
+  <div id="syncAuth" style="display:none">
+    <label class="small">Sync account email</label>
+    <input id="syncEmail" type="email" autocomplete="email">
+    <label class="small">Password</label>
+    <input id="syncPassword" type="password" autocomplete="current-password">
+    <div style="display:flex;gap:7px;margin-top:7px">
+      <button class="save" id="syncSignIn" style="flex:1">Sign In</button>
+      <button class="save" id="syncSignOut" style="flex:1;background:#e5e5ea;color:#111">Sign Out</button>
+    </div>
+  </div>
+
+  <div id="syncActions" style="display:none;margin-top:9px">
+    <div style="display:flex;gap:7px">
+      <button class="save" id="syncSave" style="flex:1">☁️ Save to Cloud</button>
+      <button class="save" id="syncLoad" style="flex:1">⬇️ Load from Cloud</button>
+    </div>
+    <div id="syncLast" class="small" style="margin-top:7px;text-align:center"></div>
+  </div>
+
+  <button class="save" id="syncClose" style="margin-top:8px;background:#e5e5ea;color:#111">Close</button>
+</section>
 
 <section id="editor">
 <div class="sheetTitle" id="editorTitle">Edit Territory</div>
@@ -109,15 +250,53 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <button data-status="nothome" style="background:#fff4c7">🟡 Not Home</button>
 <button data-status="return" style="background:#dceaff">🔵 Return</button>
 <button data-status="dnc" style="background:#eee">🚫 DNC</button>
+<button data-status="" style="background:#f2f2f7">⚪ Not Worked</button>
 </div>
 <textarea id="houseNote" placeholder="Add a note..."></textarea>
-<button class="save" id="saveNote">Save</button>
+<div style="display:flex;gap:7px;margin-top:7px"><button class="save" id="saveNote" style="flex:1">Save Note</button><button class="save" id="cancelHouse" style="flex:1;background:#e5e5ea;color:#111">Cancel</button></div>
 </section>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
 'use strict';
+// Cross-device map-data transfer. Static GitHub Pages cannot directly share
+// localStorage between the PC and iPhone, so this provides a safe JSON export/import.
+function exportMapData(){
+  const payload={
+    version:1,
+    territory:territory,
+    dnw:dnw,
+    dnwNames:dnwNames,
+    exportedAt:new Date().toISOString()
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='territory-tracker-map-data.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function importMapDataFile(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const data=JSON.parse(reader.result);
+      if(!Array.isArray(data.territory)||!Array.isArray(data.dnw)) throw new Error('Invalid map data');
+      if(!confirm('Import this map data? This will replace the territory and Do Not Work boundaries on this device.')) return;
+      territory=data.territory;
+      dnw=data.dnw;
+      dnwNames=Array.isArray(data.dnwNames)?data.dnwNames:[];
+      while(dnwNames.length<dnw.length) dnwNames.push(`Do Not Work Area ${dnwNames.length+1}`);
+      dnwNames=dnwNames.slice(0,dnw.length);
+      localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+      localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
+      location.reload();
+    }catch(e){alert('That file does not contain valid Territory Tracker map data.');}
+  };
+  reader.readAsText(file);
+}
 const map=L.map('map').setView([39.963,-79.878],14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap contributors'}).addTo(map);
 
@@ -225,26 +404,151 @@ let editorTarget='territory', editMode=false, addMode=false, roadMode=false, add
 let handles=[], selectedPointIndices=[], roadPreview=null, pendingRoad=null, original=null;
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+
 const $=id=>document.getElementById(id);
 
-function exportMapData(){
+let syncClient=null;
+let syncUser=null;
+let syncUrl=localStorage.getItem('tt_supabase_url')||'';
+let syncKey=localStorage.getItem('tt_supabase_publishable_key')||'';
+
+function syncSetStatus(t,ok=false){
+  $('syncStatus').textContent=t;
+  $('syncStatus').style.color=ok?'#16803c':'#444';
+}
+function syncShow(){
+  $('syncSheet').classList.add('show');
+  $('syncUrl').value=syncUrl;
+  $('syncKey').value=syncKey;
+  if(syncClient) syncRefreshSession();
+}
+function syncHide(){
+  $('syncSheet').classList.remove('show');
+}
+async function syncConnect(){
+  const url=$('syncUrl').value.trim().replace(/\/+$/,'');
+  const key=$('syncKey').value.trim();
+  if(!url||!key){syncSetStatus('Enter the Project URL and Publishable key.');return}
+  try{
+    syncClient=window.supabase.createClient(url,key,{
+      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    });
+    syncUrl=url;syncKey=key;
+    localStorage.setItem('tt_supabase_url',url);
+    localStorage.setItem('tt_supabase_publishable_key',key);
+    syncSetStatus('Connected to Supabase. Sign in below.',true);
+    $('syncAuth').style.display='block';
+    $('syncSetup').style.display='none';
+    await syncRefreshSession();
+  }catch(e){
+    console.error(e);
+    syncSetStatus('Could not connect. Check the Project URL and Publishable key.');
+  }
+}
+async function syncRefreshSession(){
+  if(!syncClient)return;
+  const {data,error}=await syncClient.auth.getUser();
+  if(error || !data?.user){
+    syncUser=null;
+    $('syncActions').style.display='none';
+    $('syncStatus').textContent='Connected. Please sign in.';
+    return;
+  }
+  syncUser=data.user;
+  $('syncActions').style.display='block';
+  $('syncStatus').textContent='Signed in as '+syncUser.email;
+}
+async function syncSignIn(){
+  if(!syncClient){syncSetStatus('Connect to Supabase first.');return}
+  const email=$('syncEmail').value.trim();
+  const password=$('syncPassword').value;
+  if(!email||!password){syncSetStatus('Enter your email and password.');return}
+  const {data,error}=await syncClient.auth.signInWithPassword({email,password});
+  if(error){syncSetStatus('Sign in failed: '+error.message);return}
+  syncUser=data.user;
+  $('syncPassword').value='';
+  $('syncActions').style.display='block';
+  syncSetStatus('Signed in as '+syncUser.email,true);
+}
+async function syncSignOut(){
+  if(syncClient) await syncClient.auth.signOut();
+  syncUser=null;
+  $('syncActions').style.display='none';
+  syncSetStatus('Signed out.');
+}
+async function syncSaveCloud(){
+  if(!syncClient||!syncUser){syncSetStatus('Please sign in first.');return}
+  syncSetStatus('Saving map to cloud...');
   const payload={
-    version:1,
     territory:territory,
     dnw:dnw,
-    dnwNames:dnwNames,
-    exportedAt:new Date().toISOString()
+    dnw_names:dnwNames,
+    updated_at:new Date().toISOString()
   };
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='territory-tracker-map-data.json';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  const {data:existing,error:readError}=await syncClient
+    .from('territory_data')
+    .select('id')
+    .eq('user_id',syncUser.id)
+    .limit(1);
+  if(readError){syncSetStatus('Cloud read failed: '+readError.message);return}
+  let result;
+  if(existing&&existing.length){
+    result=await syncClient.from('territory_data')
+      .update(payload).eq('id',existing[0].id);
+  }else{
+    result=await syncClient.from('territory_data')
+      .insert({...payload,user_id:syncUser.id});
+  }
+  if(result.error){syncSetStatus('Cloud save failed: '+result.error.message);return}
+  $('syncLast').textContent='Last saved: '+new Date().toLocaleString();
+  syncSetStatus('Map saved to cloud.',true);
 }
+async function syncLoadCloud(){
+  if(!syncClient||!syncUser){syncSetStatus('Please sign in first.');return}
+  syncSetStatus('Loading map from cloud...');
+  const {data,error}=await syncClient.from('territory_data')
+    .select('id,territory,dnw,dnw_names,updated_at')
+    .eq('user_id',syncUser.id).order('updated_at',{ascending:false}).limit(1);
+  if(error){syncSetStatus('Cloud load failed: '+error.message);return}
+  if(!data||!data.length){syncSetStatus('No cloud map has been saved yet.');return}
+  const row=data[0];
+  if(!confirm('Load the cloud map? This will replace the territory and Do Not Work boundaries on this device.'))return;
+  if(!Array.isArray(row.territory)||!Array.isArray(row.dnw)){syncSetStatus('Cloud data is invalid.');return}
+  territory=row.territory;
+  dnw=row.dnw;
+  dnwNames=Array.isArray(row.dnw_names)?row.dnw_names:[];
+  while(dnwNames.length<dnw.length) dnwNames.push(`Do Not Work Area ${dnwNames.length+1}`);
+  dnwNames=dnwNames.slice(0,dnw.length);
+  localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+  localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
+  localStorage.setItem('tt_last_cloud_sync',row.updated_at||new Date().toISOString());
+  location.reload();
+}
+
+$('cloudSync').addEventListener('click',syncShow);
+$('syncClose').addEventListener('click',syncHide);
+$('syncConnect').addEventListener('click',syncConnect);
+$('syncSignIn').addEventListener('click',syncSignIn);
+$('syncSignOut').addEventListener('click',syncSignOut);
+$('syncSave').addEventListener('click',syncSaveCloud);
+$('syncLoad').addEventListener('click',syncLoadCloud);
+
+if(syncUrl&&syncKey){
+  // Reconnect silently; authentication session is persisted by supabase-js.
+  try{
+    syncClient=window.supabase.createClient(syncUrl,syncKey,{
+      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    });
+  }catch(e){console.warn('Supabase reconnect failed',e)}
+}
+
+
 $('exportData').addEventListener('click',exportMapData);
+$('importData').addEventListener('change',e=>{
+  if(e.target.files&&e.target.files[0]) importMapDataFile(e.target.files[0]);
+  e.target.value='';
+});
+
 function banner(t){$('banner').textContent=t;$('banner').style.display=t?'block':'none'}
 function currentDNWIndex(){
   if(activeDNWIndex!==null)return activeDNWIndex;
@@ -415,7 +719,7 @@ function closeEditor(save){
   stopRoadMode();
   clearHandles();
   editMode=false; addMode=false; addingDNW=false; activeDNWIndex=null; original=null;
-  $('editor').classList.remove('show');
+  $('editor').classList.remove('show');document.body.classList.remove('editor-open');
   $('dnwChooser').style.display='none';
   dnwLayers.forEach(layer=>{
     if(layer)layer.setStyle({color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48});
@@ -429,7 +733,7 @@ $('editTerritory').addEventListener('click',()=>{
   stopRoadMode(); clearHandles();
   editorTarget='territory'; editMode=true; addMode=false; addingDNW=false; activeDNWIndex=null;
   original=JSON.parse(JSON.stringify({territory,dnw,dnwNames}));
-  $('editor').classList.add('show');
+  $('editor').classList.add('show');document.body.classList.add('editor-open');
   $('dnwChooser').style.display='none';
   $('editorTitle').textContent='Edit Territory';
   $('editorHelp').textContent='Edit the red territory boundary. Drag points, add points, or use Follow Road.';
@@ -458,7 +762,7 @@ function setActiveDNW(idx){
 
 $('editDNW').addEventListener('click',()=>{
   original=JSON.parse(JSON.stringify({territory,dnw}));
-  $('editor').classList.add('show');
+  $('editor').classList.add('show');document.body.classList.add('editor-open');
   if(!dnw.length){ beginAddDNW(); return; }
   activeDNWIndex = activeDNWIndex!==null && activeDNWIndex<dnw.length ? activeDNWIndex : dnw.length-1;
   setActiveDNW(activeDNWIndex);
@@ -490,7 +794,7 @@ function beginAddDNW(){
   localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
   activeDNWIndex=idx; editorTarget='dnw'+idx;
   ensureDNWLayer(idx);
-  $('editor').classList.add('show');
+  $('editor').classList.add('show');document.body.classList.add('editor-open');
   $('dnwChooser').style.display='none';
   $('dnwAddHelp').style.display='block';
   $('finishDNW').style.display='inline-block';
@@ -803,20 +1107,70 @@ async function loadHouses(){
 
   L.geoJSON(gj,{
     style:f=>buildingStyle(records[String(f.properties.OBJECTID)]?.status),
-    onEachFeature:(f,l)=>l.on('click',()=>openHouse(String(f.properties.OBJECTID)))
+    onEachFeature:(f,l)=>l.on('click',()=>openHouse(String(f.properties.OBJECTID),f))
   }).addTo(houseLayer);
  }catch(e){console.warn('Building layer unavailable',e)}
 }
 
-function openHouse(id){
- houseCurrent=id;$('houseTitle').textContent='Building';$('houseNote').value=records[id]?.note||'';$('houseSheet').classList.add('show');
+let houseCurrentPoint=null;
+
+function escapeHtml(s){
+ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 }
+
+async function reverseHouseAddress(lat,lng){
+  try{
+    const u=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
+    const r=await fetch(u,{headers:{'Accept':'application/json'}});
+    if(!r.ok)throw Error();
+    const d=await r.json();
+    return d?.display_name || '';
+  }catch(e){
+    return '';
+  }
+}
+
+function openHouse(id, feature){
+ houseCurrent=id;
+ houseCurrentPoint=null;
+ $('houseTitle').textContent='House';
+ $('houseNote').value=records[id]?.note||'';
+ $('houseSheet').classList.add('show');
+
+ const center=L.geoJSON(feature).getBounds().getCenter();
+ houseCurrentPoint={lat:center.lat,lng:center.lng};
+ reverseHouseAddress(center.lat,center.lng).then(addr=>{
+   if(houseCurrent!==id || !houseCurrentPoint)return;
+   if(addr){
+     $('houseTitle').textContent='🏠 '+addr;
+   }else{
+     $('houseTitle').textContent='🏠 House';
+   }
+ });
+}
+
 document.querySelectorAll('[data-status]').forEach(b=>b.addEventListener('click',()=>{
- if(!houseCurrent)return;records[houseCurrent]={...(records[houseCurrent]||{}),status:b.dataset.status};localStorage.setItem('tt_house_records_stable',JSON.stringify(records));$('houseSheet').classList.remove('show');loadHouses();
+ if(!houseCurrent)return;
+ const status=b.dataset.status;
+ const rec={...(records[houseCurrent]||{})};
+ if(status) rec.status=status;
+ else delete rec.status;
+ records[houseCurrent]=rec;
+ localStorage.setItem('tt_house_records_stable',JSON.stringify(records));
+ $('houseSheet').classList.remove('show');
+ houseCurrent=null;
+ houseCurrentPoint=null;
+ loadHouses();
 }));
 $('saveNote').addEventListener('click',()=>{
  if(!houseCurrent)return;records[houseCurrent]={...(records[houseCurrent]||{}),note:$('houseNote').value};localStorage.setItem('tt_house_records_stable',JSON.stringify(records));$('houseSheet').classList.remove('show');
 });
+$('cancelHouse').addEventListener('click',()=>{
+ houseCurrent=null;
+ houseCurrentPoint=null;
+ $('houseSheet').classList.remove('show');
+});
+
 function updateHouseButton(){
   $('houses').textContent=housesVisible?'🏠 Houses OFF':'🏠 Houses ON';
   $('houses').classList.toggle('blue',housesVisible);
