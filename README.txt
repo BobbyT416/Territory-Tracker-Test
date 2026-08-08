@@ -1,15 +1,9 @@
-Version 10 — point-first Follow Road workflow.
-
-New workflow:
-1. Use Add Point to place blue points at all desired intersections/corners.
-2. Enter Follow Road.
-3. Tap two adjacent blue points in order.
-4. Review the blue road preview.
+Version 11 — visibility-only fix over Version 10.
+The Version 10 editor was rebuilt from a stable base that used a bottom panel z-index below Leaflet map panes. Version 11 restores the editor panel above the map so all edit controls are visible and clickable.
+Follow Road workflow remains:
+1. Add blue points at intersections.
+2. Follow Road.
+3. Tap adjacent Point 1 and Point 2.
+4. Review preview.
 5. Tap Add Road Segment.
-6. Repeat with the next adjacent pair.
-
-Also includes:
-- Delete Selected: tap a blue point, then delete it.
-- Delete Last remains available.
-- Freehand dragging remains available.
-- Follow Road will not accept non-adjacent points, preventing runaway polygon geometry.
+6. Repeat.
