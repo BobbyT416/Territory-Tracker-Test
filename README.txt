@@ -1,7 +1,7 @@
-Version 27 — recovery build based directly on Version 24.
+Version 24 — Territory Card / Live Map toggle.
 
-- Keeps Version 24's working controls and Territory Card behavior.
-- Hides only live-map Do Not Work labels while the Territory Card is displayed.
-- Restores the original built-in Cardale Do Not Work area ONLY if it is missing from saved data.
-- Does not overwrite existing custom territory or Do Not Work geometry.
-- Cardale recovery is named "Do Not Work - Cardale".
+- Territory Card button now switches to a full, opaque view of the original card.
+- The card is fit to the map viewport so the card is actually readable.
+- While the card is displayed, the button changes to Live Map.
+- Tapping Live Map removes the card and restores the previous live-map center/zoom.
+- The card is no longer shown as a faint transparent overlay over the live map.
