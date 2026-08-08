@@ -35,7 +35,6 @@
 <button id="locate">📍 My Location</button>
 <button id="card">🗺️ Territory Card</button>
 <button id="edit">✏️ Edit Territory</button>
-<button id="followRoad">🛣️ Follow Road</button>
 <button id="dnwEdit">🟨 Edit Do Not Work</button>
 <button id="remaining">Remaining</button>
 </div>
@@ -70,10 +69,22 @@
 
 <div id="editor">
 <h2 id="editorTitle">Edit Territory</h2>
-<div class="small" id="editorHelp">Drag the boundary handles. Use Add Point to add a point, then tap the map. Save when finished.</div>
+<div class="small" id="editorHelp">Choose how you want to edit this boundary.</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px">
+<button id="freehand" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#e5e5ea">✏️ Freehand</button>
+<button id="followRoad" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#007aff;color:#fff">🛣️ Follow Road</button>
+</div>
 <div class="editorBtns">
 <button id="addPoint">➕ Add Point</button><button id="deletePoint">➖ Delete Last</button>
 <button id="saveEdit" class="primary">Save Changes</button><button id="cancelEdit">Cancel</button>
+</div>
+<div id="roadControls" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #ddd">
+<div style="font-size:12px;color:#666">Follow Road: tap the starting point/road, then tap the intersection where the boundary should turn. Preview the route, then add it.</div>
+<div id="roadName" style="font-weight:700;font-size:13px;margin-top:7px"></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px">
+<button id="roadAdd" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#34c759;color:#fff">Add Road Segment</button>
+<button id="roadCancel" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#e5e5ea">Cancel Road</button>
+</div>
 </div>
 </div>
 
@@ -101,195 +112,189 @@ const territoryLayer=L.polygon(territory,{color:'#d71920',weight:4,fillColor:'#d
 const dnwLayers=dnw.map((p,i)=>L.polygon(p,{color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}).addTo(map).bindTooltip(i===0?'Do Not Work — Republic':'Do Not Work — Cardale'));
 
 let editMode=null, handles=[], addMode=false, originalGeom=null;
-function banner(text){const b=document.getElementById('modeBanner');b.textContent=text;b.style.display=text?'block':'none'}
+let roadTool=false, roadStart=null, roadPreview=null, pendingRoad=null;
+let editorTarget='territory';
+
+function banner(text){
+ const b=document.getElementById('modeBanner');
+ b.textContent=text;b.style.display=text?'block':'none';
+}
 function clearHandles(){handles.forEach(h=>map.removeLayer(h));handles=[]}
-function makeHandles(points){
+function currentArray(){
+ if(editorTarget==='territory') return territory;
+ return dnw[editorTarget==='dnw0'?0:1];
+}
+function currentLayer(){
+ if(editorTarget==='territory') return territoryLayer;
+ return dnwLayers[editorTarget==='dnw0'?0:1];
+}
+function makeHandles(){
  clearHandles();
- points.forEach((pt,i)=>{
-  const h=L.marker(pt,{draggable:true}).addTo(map);
-  h.on('drag',e=>{points[i]=[e.latlng.lat,e.latlng.lng]; redrawEditing()});
-  handles.push(h);
+ const arr=currentArray();
+ arr.forEach((pt,i)=>{
+   const h=L.marker(pt,{draggable:true}).addTo(map);
+   h.on('drag',e=>{arr[i]=[e.latlng.lat,e.latlng.lng];currentLayer().setLatLngs(arr)});
+   handles.push(h);
  });
 }
-function redrawEditing(){
- if(editMode==='territory') territoryLayer.setLatLngs(territory);
- if(editMode==='dnw0') dnwLayers[0].setLatLngs(dnw[0]);
- if(editMode==='dnw1') dnwLayers[1].setLatLngs(dnw[1]);
- handles.forEach((h,i)=>{
-   const arr=editMode==='territory'?territory:dnw[Number(editMode.slice(3))];
-   if(arr[i]) h.setLatLng(arr[i]);
- });
-}
-function startEdit(mode){
+function startEdit(target){
+ if(roadMode) stopRoadMode();
+ editorTarget=target; editMode=true; addMode=false; roadTool=false;
  originalGeom=JSON.parse(JSON.stringify({territory,dnw}));
- editMode=mode; addMode=false;
- const arr=mode==='territory'?territory:dnw[Number(mode.slice(3))];
- makeHandles(arr);
  document.getElementById('editor').classList.add('show');
- document.getElementById('editorTitle').textContent=mode==='territory'?'Edit Territory':'Edit Do Not Work Area';
- document.getElementById('editorHelp').textContent='Drag handles for fine adjustment, or use Follow Road to build long boundary sections along actual streets. Add Point inserts a new corner. Save when finished.';
- banner(mode==='territory'?'EDITING TERRITORY BOUNDARY':'EDITING DO NOT WORK AREA');
+ document.getElementById('roadControls').style.display='none';
+ document.getElementById('freehand').style.background='#007aff';
+ document.getElementById('freehand').style.color='#fff';
+ document.getElementById('followRoad').style.background='#e5e5ea';
+ document.getElementById('followRoad').style.color='#111';
+ document.getElementById('editorTitle').textContent=
+   target==='territory'?'Edit Territory':(target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale');
+ document.getElementById('editorHelp').textContent='Drag a handle to fine-tune. Add Point inserts a point exactly where you tap on the map.';
+ makeHandles();
+ banner('EDITING '+document.getElementById('editorTitle').textContent.toUpperCase());
 }
 function stopEdit(save){
- if(!save && originalGeom){territory=originalGeom.territory;dnw=originalGeom.dnw;territoryLayer.setLatLngs(territory);dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);}
- if(save){localStorage.setItem('tt_geometry_v3',JSON.stringify({territory,dnw}));}
- clearHandles();editMode=null;addMode=false;originalGeom=null;
+ if(!save && originalGeom){
+   territory=originalGeom.territory;dnw=originalGeom.dnw;
+   territoryLayer.setLatLngs(territory);dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);
+ }
+ if(save) localStorage.setItem('tt_geometry_v3',JSON.stringify({territory,dnw}));
+ clearHandles();editMode=null;addMode=false;editorTarget='territory';originalGeom=null;
+ stopRoadTool();
  document.getElementById('editor').classList.remove('show');banner('');
 }
-document.getElementById('edit').onclick=()=>{if(roadMode)stopRoadMode();startEdit('territory')};
-document.getElementById('dnwEdit').onclick=()=>{if(roadMode)stopRoadMode();startEdit('dnw0');};
-document.getElementById('addPoint').onclick=()=>{addMode=!addMode;banner(addMode?'ADD POINT: tap the map to add a corner':'EDITING '+(editMode==='territory'?'TERRITORY':'DO NOT WORK AREA'))};
+function stopRoadTool(){
+ roadTool=false;roadStart=null;pendingRoad=null;
+ if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
+ document.getElementById('roadControls').style.display='none';
+}
+document.getElementById('edit').onclick=()=>startEdit('territory');
+document.getElementById('dnwEdit').onclick=()=>startEdit('dnw0');
+
+document.getElementById('freehand').onclick=()=>{
+ stopRoadTool(); addMode=false; makeHandles();
+ document.getElementById('roadControls').style.display='none';
+ document.getElementById('freehand').style.background='#007aff';
+ document.getElementById('freehand').style.color='#fff';
+ document.getElementById('followRoad').style.background='#e5e5ea';
+ document.getElementById('followRoad').style.color='#111';
+ document.getElementById('editorHelp').textContent='Drag a handle to fine-tune. Add Point inserts a point exactly where you tap on the map.';
+ banner('FREEHAND EDITING');
+};
+document.getElementById('followRoad').onclick=()=>{
+ addMode=false; roadTool=true; roadStart=null; pendingRoad=null;
+ if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
+ document.getElementById('roadControls').style.display='block';
+ document.getElementById('freehand').style.background='#e5e5ea';
+ document.getElementById('freehand').style.color='#111';
+ document.getElementById('followRoad').style.background='#007aff';
+ document.getElementById('followRoad').style.color='#fff';
+ document.getElementById('roadName').textContent='Tap the starting road or boundary corner.';
+ banner('FOLLOW ROAD: TAP START');
+};
+document.getElementById('addPoint').onclick=()=>{
+ stopRoadTool(); addMode=true; makeHandles();
+ document.getElementById('editorHelp').textContent='ADD POINT MODE: tap anywhere on the map. The new point will be inserted into the nearest boundary segment at the exact location you tap.';
+ banner('ADD POINT: TAP THE MAP');
+};
 document.getElementById('deletePoint').onclick=()=>{
- const arr=editMode==='territory'?territory:dnw[Number(editMode.slice(3))];
- if(arr.length>3){arr.pop();redrawEditing()}
+ const arr=currentArray();
+ if(arr.length<=3)return;
+ arr.pop(); currentLayer().setLatLngs(arr); makeHandles();
 };
 document.getElementById('saveEdit').onclick=()=>stopEdit(true);
 document.getElementById('cancelEdit').onclick=()=>stopEdit(false);
+
+function nearestSegmentIndex(arr, p){
+ let best=Infinity, idx=0;
+ for(let i=0;i<arr.length;i++){
+   const a=arr[i], b=arr[(i+1)%arr.length];
+   const dx=b[1]-a[1],dy=b[0]-a[0];
+   const denom=dx*dx+dy*dy;
+   let t=denom?((p[1]-a[1])*dx+(p[0]-a[0])*dy)/denom:0;
+   t=Math.max(0,Math.min(1,t));
+   const q=[a[0]+t*dy,a[1]+t*dx];
+   const d=(p[0]-q[0])**2+(p[1]-q[1])**2;
+   if(d<best){best=d;idx=i}
+ }
+ return idx;
+}
+function insertAtClick(latlng){
+ const arr=currentArray(), p=[latlng.lat,latlng.lng];
+ const idx=nearestSegmentIndex(arr,p);
+ arr.splice(idx+1,0,p);
+ currentLayer().setLatLngs(arr);
+ makeHandles();
+ // Highlight the new point briefly.
+ if(handles[idx+1]) handles[idx+1].openTooltip?.();
+}
 map.on('click',e=>{
- if(!editMode||!addMode)return;
- const arr=editMode==='territory'?territory:dnw[Number(editMode.slice(3))];
- arr.push([e.latlng.lat,e.latlng.lng]); addMode=false; makeHandles(arr); redrawEditing();
- banner('EDITING '+(editMode==='territory'?'TERRITORY':'DO NOT WORK AREA'));
+ if(!editMode) return;
+ if(addMode){insertAtClick(e.latlng);addMode=false;banner('POINT ADDED — drag it if needed');return}
+ if(!roadTool) return;
+ handleRoadClick(e.latlng);
 });
-
-let records=JSON.parse(localStorage.getItem('tt_records_v3')||'{}'), current=null;
-let buildingLayer=L.layerGroup().addTo(map), housesVisible=true;
-function fill(s){return s==='worked'?'#34c759':s==='nothome'?'#ffcc00':s==='return'?'#007aff':s==='dnc'?'#8e8e93':'#c7c7cc'}
-function buildingStyle(s){return {color:'#555',weight:1,fillColor:fill(s),fillOpacity:s?0.60:0.18}}
-function openHouse(id,props){
- current={id,props};document.getElementById('house').textContent=props?.address||'Building';
- document.getElementById('note').value=(records[id]||{}).note||'';
- document.getElementById('sheet').classList.add('show');
-}
-document.getElementById('save').onclick=()=>{
- if(!current)return;
- records[current.id]={...(records[current.id]||{}),note:document.getElementById('note').value};
- localStorage.setItem('tt_records_v3',JSON.stringify(records));
- document.getElementById('sheet').classList.remove('show');
- loadBuildings();
-};
-document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{
- if(!current)return;
- records[current.id]={...(records[current.id]||{}),status:b.dataset.s};
- localStorage.setItem('tt_records_v3',JSON.stringify(records));
- document.getElementById('sheet').classList.remove('show');loadBuildings();
-});
-
-async function loadBuildings(){
- if(!housesVisible){buildingLayer.clearLayers();return}
- const b=map.getBounds(), pad=.004;
- const geom=encodeURIComponent(JSON.stringify({xmin:b.getWest()-pad,ymin:b.getSouth()-pad,xmax:b.getEast()+pad,ymax:b.getNorth()+pad,spatialReference:{wkid:4326}}));
- const url='https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/MSBFP2/FeatureServer/0/query?f=geojson&where=1%3D1&returnGeometry=true&outFields=OBJECTID&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&geometry='+geom+'&outSR=4326&resultRecordCount=2000';
- try{
-  const r=await fetch(url);if(!r.ok)throw new Error('Building service unavailable');
-  const gj=await r.json();buildingLayer.clearLayers();
-  L.geoJSON(gj,{style:f=>buildingStyle(records[f.properties.OBJECTID]?.status),onEachFeature:(f,l)=>{
-   l.on('click',()=>openHouse(String(f.properties.OBJECTID),f.properties));
-  }}).addTo(buildingLayer);
- }catch(e){console.warn(e)}
-}
-map.on('moveend',()=>loadBuildings());loadBuildings();
-
-document.getElementById('houses').onclick=()=>{
- housesVisible=!housesVisible;
- document.getElementById('houses').textContent=housesVisible?'🏠 Houses ON':'🏠 Houses OFF';
- document.getElementById('houses').className=housesVisible?'blue':'';
- if(housesVisible)loadBuildings();else buildingLayer.clearLayers();
-};
-document.getElementById('remaining').onclick=()=>{
- if(!housesVisible){housesVisible=true;document.getElementById('houses').textContent='🏠 Houses ON';loadBuildings();}
- setTimeout(()=>buildingLayer.eachLayer(l=>{const id=String(l.feature.properties.OBJECTID);l.setStyle({fillOpacity:records[id]?.status?0.08:0.60})}),500);
-};
-
-// Road-following boundary mode.
-// Uses the OSRM public routing service: clicks are snapped to the street network,
-// then the route geometry between the two clicks becomes the boundary segment.
-// This is a prototype; the final app can use a dedicated road-vector service
-// so the user can select the exact named road rather than relying on shortest-path routing.
-let roadMode=false, roadStart=null, roadPreview=null, roadSegments=[];
-const roadPanel=document.getElementById('roadPanel');
-const roadName=document.getElementById('roadName');
-
-function startRoadMode(){
-  roadMode=true; roadStart=null; roadSegments=[];
-  roadPanel.style.display='block';
-  banner('FOLLOW ROAD: tap the starting road');
-  roadName.textContent='';
-}
-function stopRoadMode(){
-  roadMode=false; roadStart=null;
-  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
-  roadPanel.style.display='none';
-  banner('');
-}
-document.getElementById('followRoad').onclick=()=>roadMode?stopRoadMode():startRoadMode();
-document.getElementById('roadCancel').onclick=stopRoadMode;
 
 async function snapPoint(lat,lng){
-  const u=`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}.json?number=1`;
-  const r=await fetch(u); if(!r.ok) throw new Error('Could not snap to road');
-  const j=await r.json();
-  if(j.code!=='Ok'||!j.waypoints?.length) throw new Error('No nearby road found');
-  const w=j.waypoints[0];
-  return {lat:w.location[1],lng:w.location[0],distance:w.distance};
+ const u=`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}.json?number=1`;
+ const r=await fetch(u);if(!r.ok)throw new Error();
+ const j=await r.json();if(j.code!=='Ok'||!j.waypoints?.length)throw new Error();
+ const w=j.waypoints[0];return {lat:w.location[1],lng:w.location[0]};
 }
 async function routeSegment(a,b){
-  const u=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson&steps=true&alternatives=true`;
-  const r=await fetch(u); if(!r.ok) throw new Error('Could not route between points');
-  const j=await r.json();
-  if(j.code!=='Ok'||!j.routes?.length) throw new Error('No road route found');
-  return j.routes[0];
+ const u=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson&steps=true`;
+ const r=await fetch(u);if(!r.ok)throw new Error();
+ const j=await r.json();if(j.code!=='Ok'||!j.routes?.length)throw new Error();
+ return j.routes[0];
 }
-async function reverseRoadName(lat,lng){
-  try{
-    const u=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
-    const r=await fetch(u,{headers:{'Accept':'application/json'}});
-    if(!r.ok)return '';
-    const j=await r.json();
-    return j.address?.road||'';
-  }catch(e){return ''}
+async function roadLabel(lat,lng){
+ try{
+  const u=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`;
+  const r=await fetch(u);if(!r.ok)return '';
+  const j=await r.json();return j.address?.road||'';
+ }catch(e){return ''}
 }
-map.on('click',async e=>{
-  if(!roadMode || editMode) return;
-  try{
-    const snapped=await snapPoint(e.latlng.lat,e.latlng.lng);
-    if(!roadStart){
-      roadStart=snapped;
-      L.circleMarker([snapped.lat,snapped.lng],{radius:7,color:'#007aff',fillColor:'#007aff',fillOpacity:1}).addTo(map);
-      const name=await reverseRoadName(snapped.lat,snapped.lng);
-      roadName.textContent=name?`Start road: ${name}`:'Start point snapped to road';
-      banner('FOLLOW ROAD: now tap the intersection / ending point');
-      return;
-    }
-    const end=snapped;
-    const route=await routeSegment(roadStart,end);
-    const coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
-    if(roadPreview)map.removeLayer(roadPreview);
-    roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.8,dashArray:'10 7'}).addTo(map);
-    const name=await reverseRoadName(roadStart.lat,roadStart.lng);
-    roadName.textContent=(name?`Road segment: ${name}`:'Road segment found')+` • ${Math.round(route.distance)} m`;
-    window._pendingRoad={coords,route,name};
-    banner('ROAD PREVIEW: tap “Add Road Segment” to add it to the boundary');
-  }catch(err){
-    roadName.textContent='I could not find a road at that location. Try tapping closer to the road.';
+async function handleRoadClick(latlng){
+ try{
+  const p=await snapPoint(latlng.lat,latlng.lng);
+  if(!roadStart){
+    roadStart=p;
+    const name=await roadLabel(p.lat,p.lng);
+    document.getElementById('roadName').textContent=name?`Starting road: ${name}`:'Starting road selected';
+    banner('FOLLOW ROAD: TAP THE INTERSECTION / END');
+    return;
   }
-});
+  const end=p, route=await routeSegment(roadStart,end);
+  const coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
+  if(roadPreview)map.removeLayer(roadPreview);
+  roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.85,dashArray:'10 7'}).addTo(map);
+  pendingRoad={coords,start:roadStart,end};
+  const name=await roadLabel(roadStart.lat,roadStart.lng);
+  document.getElementById('roadName').textContent=(name?`Preview: ${name}`:'Road segment preview')+` • ${Math.round(route.distance)} m`;
+  banner('ROAD PREVIEW — TAP ADD ROAD SEGMENT');
+ }catch(e){
+  document.getElementById('roadName').textContent='Could not find a road there. Tap directly on a road.';
+ }
+}
 document.getElementById('roadAdd').onclick=()=>{
-  if(!window._pendingRoad)return;
-  const coords=window._pendingRoad.coords;
-  // Add the routed geometry to the territory polygon in sequence.
-  // The first segment starts from the current territory end; subsequent segments append.
-  if(!territory.length) territory=coords.slice();
-  else territory.push(...coords);
-  territoryLayer.setLatLngs(territory);
-  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
-  roadSegments.push(window._pendingRoad);
-  window._pendingRoad=null;
-  roadStart=null;
-  roadName.textContent='Road segment added. Tap the next road segment start.';
-  banner('FOLLOW ROAD: tap the next road segment');
+ if(!pendingRoad)return;
+ const arr=currentArray(), coords=pendingRoad.coords;
+ // Insert the route immediately after the nearest boundary vertex to the start.
+ let vi=0,best=Infinity;
+ arr.forEach((p,i)=>{const d=(p[0]-pendingRoad.start.lat)**2+(p[1]-pendingRoad.start.lng)**2;if(d<best){best=d;vi=i}});
+ // If the snapped start is not already close to a boundary vertex, add it first.
+ if(Math.sqrt(best)>0.0005){arr.splice(vi+1,0,[pendingRoad.start.lat,pendingRoad.start.lng]);vi=vi+1}
+ // Insert the route excluding its first point so the boundary follows the road.
+ arr.splice(vi+1,0,...coords.slice(1));
+ currentLayer().setLatLngs(arr);makeHandles();
+ if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
+ pendingRoad=null;roadStart=null;
+ document.getElementById('roadName').textContent='Segment added. Tap the next road/intersection.';
+ banner('FOLLOW ROAD: TAP NEXT START');
 };
-
+document.getElementById('roadCancel').onclick=()=>{
+ stopRoadTool();banner('EDITING '+document.getElementById('editorTitle').textContent.toUpperCase());
+};
 document.getElementById('locate').onclick=()=>map.locate({setView:true,maxZoom:18,enableHighAccuracy:true});
 map.on('locationfound',e=>L.circleMarker(e.latlng,{radius:8,color:'#fff',weight:3,fillColor:'#007aff',fillOpacity:1}).addTo(map).bindPopup('You are here').openPopup());
 
