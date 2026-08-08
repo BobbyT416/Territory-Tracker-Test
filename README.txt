@@ -1,9 +1,8 @@
-Version 18 — independent Do Not Work selection and naming.
+Version 19 — permanent Do Not Work labels + Houses button state.
 
-- Tap a yellow Do Not Work polygon on the map to select it, then Edit Do Not Work edits that exact area.
-- The selected area is highlighted.
-- Do Not Work areas have editable names.
-- Names appear as map labels/tooltips and in the edit selector.
-- Add Do Not Work Area creates a new independent polygon with its own name.
-- Delete This Area removes only the selected area.
-- Names persist separately from geometry.
+- Each Do Not Work area displays its saved name as a permanent label centered in the polygon.
+- Labels move/update when the polygon is edited or renamed.
+- Labels are removed/rebuilt correctly when areas are deleted or canceled.
+- Houses button now shows current state:
+  Houses ON when houses are visible.
+  Houses OFF when houses are hidden.
