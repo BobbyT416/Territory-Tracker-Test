@@ -14,7 +14,7 @@
 #map{flex:1;min-height:0}.bottom{background:#fff;padding:9px 9px calc(9px + env(safe-area-inset-bottom));box-shadow:0 -2px 12px #0002;z-index:10}
 .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.actions button{border:0;border-radius:10px;padding:10px 4px;font-weight:700;background:#e5e5ea}.actions .blue{background:#007aff;color:#fff}
 .legend{text-align:center;color:#666;font-size:10px;margin-top:7px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 7px;vertical-align:-1px}
-#editor,#houseSheet{display:none;position:fixed;left:10px;right:10px;top:82px;bottom:auto;background:#fff;border-radius:16px;box-shadow:0 4px 20px #0004;padding:14px;z-index:1000;max-height:48vh;overflow:auto}
+#editor,#houseSheet{display:none;position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px #0003;padding:16px;z-index:40}
 .show{display:block!important}.editorBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.editorBtns button,.roadBtns button{border:0;border-radius:10px;padding:11px 5px;font-weight:700;background:#e5e5ea}.editorBtns .active,.roadBtns .primary{background:#007aff;color:#fff}
 .roadControls{display:none;margin-top:10px;padding:10px;background:#f2f2f7;border-radius:12px}.roadBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
 .small{font-size:12px;color:#666}.sheetTitle{font-size:19px;font-weight:700}.statuses{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:12px 0}.statuses button{border:0;border-radius:10px;padding:10px 3px;font-weight:700}
@@ -45,7 +45,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 
 <section id="editor">
 <div class="sheetTitle" id="editorTitle">Edit Territory</div>
-<div class="small" id="editorHelp">For Follow Road: 1) tap a blue boundary handle to choose START, 2) tap the next intersection, 3) review the blue preview, 4) tap Add Road Segment.</div>
+<div class="small" id="editorHelp">EDITING ORDER: 1) Add Point at each intersection. 2) Follow Road. 3) Tap two blue points in order. 4) Review the blue road preview. 5) Tap Add Road Segment.</div>
 <div id="dnwChooser" style="display:none;margin-top:8px">
 <label class="small" for="dnwSelect">Area</label>
 <select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px">
@@ -56,12 +56,13 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <button id="freehand" class="active">✏️ Freehand</button>
 <button id="followRoad">🛣️ Follow Road</button>
 <button id="addPoint">➕ Add Point</button>
+<button id="deleteSelected">🗑️ Delete Selected</button>
 <button id="deletePoint">➖ Delete Last</button>
 <button id="saveEdit" class="active">Save Changes</button>
 <button id="cancelEdit">Cancel</button>
 </div>
 <div id="roadControls" class="roadControls">
-<div class="small">FOLLOW ROAD ORDER: tap a blue boundary handle (START) → tap the next intersection → review the blue preview → tap Add Road Segment. After adding, repeat from the new boundary corner.</div>
+<div class="small">Tap the starting road, then tap the intersection where this boundary segment should end.</div>
 <div id="roadName" style="font-weight:700;font-size:13px;margin-top:5px">Ready.</div>
 <div class="roadBtns">
 <button id="roadAdd" class="primary">Add Road Segment</button>
@@ -100,10 +101,12 @@ let territory=geometry.territory, dnw=geometry.dnw;
 const territoryLayer=L.polygon(territory,{color:'#d71920',weight:4,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
 const dnwLayers=dnw.map((p,i)=>L.polygon(p,{color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}).addTo(map).bindTooltip(i?'Do Not Work — Cardale':'Do Not Work — Republic'));
 
+
 let housesVisible=true, houseLayer=L.layerGroup().addTo(map);
 let records=JSON.parse(localStorage.getItem('tt_house_records_stable')||'{}');
 let houseCurrent=null;
-let editorTarget='territory', editMode=false, addMode=false, roadMode=false, handles=[], roadPreview=null, roadStart=null, pendingRoad=null, original=null;
+let editorTarget='territory', editMode=false, addMode=false, roadMode=false;
+let handles=[], selectedPointIndices=[], roadPreview=null, pendingRoad=null, original=null;
 
 const $=id=>document.getElementById(id);
 function banner(t){$('banner').textContent=t;$('banner').style.display=t?'block':'none'}
@@ -117,35 +120,67 @@ function makeHandles(){
  const arr=currentArray();
  arr.forEach((p,i)=>{
    const h=L.marker(p,{draggable:true}).addTo(map);
-   h.on('drag',e=>{arr[i]=[e.latlng.lat,e.latlng.lng];currentLayer().setLatLngs(arr)});
+   h._pointIndex=i;
+   h.on('drag',e=>{
+     arr[i]=[e.latlng.lat,e.latlng.lng];
+     currentLayer().setLatLngs(arr);
+   });
    h.on('click',()=>{
+     if(!editMode)return;
      if(roadMode){
-       roadStart={lat:arr[i][0],lng:arr[i][1],vertex:i};
-       handles.forEach(x=>x.setOpacity(.55));
+       // In Follow Road mode, select points in order.
+       if(selectedPointIndices.length===0){
+         selectedPointIndices=[i];
+         h.setOpacity(1);
+         $('roadName').textContent='Point 1 selected. Now tap Point 2.';
+         banner('FOLLOW ROAD: TAP POINT 2');
+         return;
+       }
+       if(selectedPointIndices.length===1){
+         if(i===selectedPointIndices[0]){
+           $('roadName').textContent='Choose a different point for Point 2.';
+           return;
+         }
+         selectedPointIndices.push(i);
+         prepareRoadPreview();
+         return;
+       }
+       // Third click starts a fresh pair.
+       selectedPointIndices=[i];
+       clearPointSelection();
        h.setOpacity(1);
-       const n=roadLabel(arr[i][0],arr[i][1]);
-       Promise.resolve(n).then(name=>{
-         $('roadName').textContent=name?`START: ${name} — now tap the next intersection`:'START selected — now tap the next intersection';
-       });
-       banner('FOLLOW ROAD: TAP THE NEXT INTERSECTION');
+       $('roadName').textContent='Point 1 selected. Now tap Point 2.';
+       banner('FOLLOW ROAD: TAP POINT 2');
+     } else {
+       // Freehand: clicking a point selects it for Delete Selected.
+       handles.forEach(x=>x.setOpacity(.65));
+       h.setOpacity(1);
+       window.selectedFreehandIndex=i;
+       banner('POINT '+(i+1)+' SELECTED');
      }
    });
    handles.push(h);
  });
+ if(roadMode)handles.forEach((h,i)=>h.setOpacity(selectedPointIndices.includes(i)?1:.65));
+}
+function clearPointSelection(){
+ selectedPointIndices=[];
+ handles.forEach(h=>h.setOpacity(.65));
 }
 function stopRoadMode(){
- roadMode=false;roadStart=null;pendingRoad=null;
+ roadMode=false; selectedPointIndices=[]; pendingRoad=null;
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
  $('roadControls').style.display='none';
+ handles.forEach(h=>h.setOpacity(1));
 }
 function startEdit(target){
  stopRoadMode(); clearHandles();
- editorTarget=target; editMode=true; addMode=false;
+ editorTarget=target; editMode=true; addMode=false; window.selectedFreehandIndex=null;
  original=JSON.parse(JSON.stringify({territory,dnw}));
  $('editor').classList.add('show');
  $('dnwChooser').style.display=target==='territory'?'none':'block';
  $('editorTitle').textContent=target==='territory'?'Edit Territory':target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale';
- $('editorHelp').textContent='Follow Road order: 1) blue boundary handle = START, 2) tap next intersection on red boundary, 3) review blue preview, 4) Add Road Segment. Repeat.';
+ $('editorHelp').textContent='Add all blue intersection points first. Then Follow Road: tap Point 1 → tap Point 2 → review blue preview → Add Road Segment. Repeat Point 2 → Point 3.';
  $('freehand').classList.add('active'); $('followRoad').classList.remove('active');
  makeHandles(); banner('EDITING '+$('editorTitle').textContent.toUpperCase());
 }
@@ -164,20 +199,39 @@ $('dnwSelect').addEventListener('change',()=>{if(editMode)startEdit($('dnwSelect
 
 $('freehand').addEventListener('click',()=>{
  if(!editMode)return;
- stopRoadMode();addMode=false;makeHandles();
+ stopRoadMode();addMode=false;window.selectedFreehandIndex=null;makeHandles();
  $('freehand').classList.add('active');$('followRoad').classList.remove('active');
- $('editorHelp').textContent='Drag a handle to fine-tune. Use Add Point to tap exactly where a new corner should be.';
+ $('editorHelp').textContent='Freehand: drag points, Add Point to create a point where you tap, or select a point and Delete Selected.';
  banner('FREEHAND EDITING');
 });
+
 $('addPoint').addEventListener('click',()=>{
  if(!editMode)return;
- stopRoadMode();addMode=true;makeHandles();
- banner('ADD POINT: TAP THE MAP WHERE YOU WANT IT');
+ stopRoadMode();addMode=true;window.selectedFreehandIndex=null;makeHandles();
+ banner('ADD POINT: TAP EXACTLY WHERE YOU WANT THE BLUE POINT');
 });
+
+$('deleteSelected').addEventListener('click',()=>{
+ if(!editMode)return;
+ let idx=window.selectedFreehandIndex;
+ if(roadMode && selectedPointIndices.length===1) idx=selectedPointIndices[0];
+ if(idx===null || idx===undefined){
+   $('editorHelp').textContent='First tap the blue point you want to delete, then tap Delete Selected.';
+   banner('SELECT A BLUE POINT FIRST');
+   return;
+ }
+ const arr=currentArray();
+ if(arr.length<=3){banner('A BOUNDARY NEEDS AT LEAST 3 POINTS');return}
+ arr.splice(idx,1);currentLayer().setLatLngs(arr);
+ window.selectedFreehandIndex=null;selectedPointIndices=[];
+ makeHandles();banner('POINT DELETED');
+});
+
 $('deletePoint').addEventListener('click',()=>{
  if(!editMode)return;
- const arr=currentArray();if(arr.length<=3)return;
- arr.pop();currentLayer().setLatLngs(arr);makeHandles();
+ const arr=currentArray();if(arr.length<=3){banner('A BOUNDARY NEEDS AT LEAST 3 POINTS');return}
+ arr.pop();currentLayer().setLatLngs(arr);window.selectedFreehandIndex=null;makeHandles();
+ banner('LAST POINT DELETED');
 });
 $('saveEdit').addEventListener('click',()=>closeEditor(true));
 $('cancelEdit').addEventListener('click',()=>closeEditor(false));
@@ -196,23 +250,26 @@ map.on('click',e=>{
  if(!editMode)return;
  if(addMode){
   const arr=currentArray(),p=[e.latlng.lat,e.latlng.lng],idx=nearestSegmentIndex(arr,p);
-  arr.splice(idx+1,0,p);currentLayer().setLatLngs(arr);makeHandles();addMode=false;
-  banner('POINT ADDED — DRAG IT TO FINE-TUNE');
+  arr.splice(idx+1,0,p);currentLayer().setLatLngs(arr);addMode=false;makeHandles();
+  banner('POINT ADDED — ADD THE NEXT INTERSECTION');
   return;
  }
- if(roadMode && roadStart)handleRoadClick(e.latlng);
 });
 
 $('followRoad').addEventListener('click',()=>{
  if(!editMode)return;
- addMode=false;roadMode=true;roadStart=null;pendingRoad=null;
+ addMode=false;roadMode=true;selectedPointIndices=[];pendingRoad=null;
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
  $('roadControls').style.display='block';
  $('followRoad').classList.add('active');$('freehand').classList.remove('active');
- $('roadName').textContent='STEP 1: Tap a blue boundary handle to choose the START.';
- banner('FOLLOW ROAD: 1 — TAP A BLUE BOUNDARY HANDLE');
+ makeHandles();
+ $('roadName').textContent='STEP 1: Tap the first blue point.';
+ banner('FOLLOW ROAD: TAP POINT 1');
 });
-$('roadCancel').addEventListener('click',()=>{stopRoadMode();banner('EDITING '+$('editorTitle').textContent.toUpperCase())});
+
+$('roadCancel').addEventListener('click',()=>{
+ stopRoadMode();makeHandles();banner('FREEHAND EDITING');
+});
 
 async function snapPoint(lat,lng){
  const r=await fetch(`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}.json?number=1`);
@@ -220,101 +277,94 @@ async function snapPoint(lat,lng){
  return {lat:j.waypoints[0].location[1],lng:j.waypoints[0].location[0]};
 }
 async function routeSegment(a,b){
- const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson&steps=true`);
- if(!r.ok)throw Error();
- const j=await r.json();
- if(j.code!=='Ok'||!j.routes?.length)throw Error();
- return j.routes[0];
+ const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson`);
+ if(!r.ok)throw Error();const j=await r.json();if(j.code!=='Ok'||!j.routes?.length)throw Error();return j.routes[0];
 }
 async function roadLabel(lat,lng){
  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`);const j=await r.json();return j.address?.road||''}catch(e){return ''}
 }
-async function handleRoadClick(ll){
+
+async function prepareRoadPreview(){
+ const arr=currentArray(),aIndex=selectedPointIndices[0],bIndex=selectedPointIndices[1];
+ // The two points must be adjacent in the polygon. This keeps the polygon valid.
+ const adjacent=(Math.abs(aIndex-bIndex)===1)||(Math.abs(aIndex-bIndex)===arr.length-1);
+ if(!adjacent){
+  $('roadName').textContent='Those points are not next to each other. Tap adjacent points in boundary order.';
+  banner('FOLLOW ROAD: CHOOSE ADJACENT POINTS');
+  selectedPointIndices.pop();
+  return;
+ }
  try{
-  const p=await snapPoint(ll.lat,ll.lng);
-  const route=await routeSegment(roadStart,p);
+  const a=arr[aIndex],b=arr[bIndex];
+  const sa=await snapPoint(a[0],a[1]),sb=await snapPoint(b[0],b[1]);
+  const route=await routeSegment(sa,sb);
   if(route.distance>5000){
-   $('roadName').textContent='That route is too long. Tap the next nearby intersection.';
+   $('roadName').textContent='That route is too long for one boundary segment. Choose the next nearby point.';
    return;
   }
   const coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
   if(roadPreview)map.removeLayer(roadPreview);
-  roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.85,dashArray:'10 7'}).addTo(map);
-
-  // Find the nearest point on the existing boundary to the clicked endpoint.
-  const arr=currentArray();
-  let best={dist:Infinity,idx:0,t:0,pt:null};
-  for(let i=0;i<arr.length;i++){
-    const a=arr[i],b=arr[(i+1)%arr.length],dx=b[1]-a[1],dy=b[0]-a[0],den=dx*dx+dy*dy;
-    let t=den?((p.lng-a[1])*dx+(p.lat-a[0])*dy)/den:0;t=Math.max(0,Math.min(1,t));
-    const q=[a[0]+t*dy,a[1]+t*dx],d=Math.hypot(p.lat-q[0],p.lng-q[1]);
-    if(d<best.dist)best={dist:d,idx:i,t,pt:q};
-  }
-  if(best.dist>0.01){
-    $('roadName').textContent='The end point is too far from the existing boundary. Tap an intersection on the red boundary.';
-    return;
-  }
-  pendingRoad={start:roadStart,end:{lat:best.pt[0],lng:best.pt[1]},coords,distance:route.distance,boundaryIdx:best.idx,boundaryPoint:best.pt};
-  const n=await roadLabel(roadStart.lat,roadStart.lng);
-  $('roadName').textContent=n?`Preview: ${n} • ${Math.round(route.distance)} m`:`Road preview • ${Math.round(route.distance)} m`;
-  banner('FOLLOW ROAD: 3 — REVIEW BLUE LINE, THEN TAP ADD ROAD SEGMENT');
+  roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.9,dashArray:'10 7'}).addTo(map);
+  pendingRoad={aIndex,bIndex,coords};
+  const name=await roadLabel(sa.lat,sa.lng);
+  $('roadName').textContent=name?`Preview: ${name} — ${Math.round(route.distance)} m`:`Road preview — ${Math.round(route.distance)} m`;
+  banner('STEP 3: REVIEW BLUE LINE, THEN TAP ADD ROAD SEGMENT');
  }catch(e){
-  $('roadName').textContent='Could not find a road there. Tap directly on the road/intersection.';
+  $('roadName').textContent='Could not find a road between those points. Try points on a mapped road.';
  }
 }
+
 $('roadAdd').addEventListener('click',()=>{
- if(!pendingRoad||roadStart===null)return;
- const arr=currentArray();
- const startIdx=roadStart.vertex;
- const endSeg=pendingRoad.boundaryIdx;
- const endPoint=pendingRoad.boundaryPoint;
+ if(!pendingRoad){
+  $('roadName').textContent='No road preview yet. Tap two adjacent blue points first.';
+  banner('FOLLOW ROAD: SELECT TWO POINTS FIRST');
+  return;
+ }
+ const arr=currentArray(),a=pendingRoad.aIndex,b=pendingRoad.bIndex;
  let path=pendingRoad.coords.slice();
 
- // Orient route from selected START toward END.
- const d0=Math.hypot(path[0][0]-roadStart.lat,path[0][1]-roadStart.lng);
- const d1=Math.hypot(path[path.length-1][0]-roadStart.lat,path[path.length-1][1]-roadStart.lng);
- if(d1<d0)path.reverse();
+ // Determine which direction the route runs.
+ const da=Math.hypot(path[0][0]-arr[a][0],path[0][1]-arr[a][1]);
+ const db=Math.hypot(path[path.length-1][0]-arr[a][0],path[path.length-1][1]-arr[a][1]);
+ if(db<da)path.reverse();
 
- // Insert the endpoint into the boundary at the nearest segment.
- arr.splice(endSeg+1,0,endPoint);
- let actualEnd=endSeg+1;
- // Adjust start index if insertion happened before it.
- const actualStart=startIdx >= actualEnd ? startIdx+1 : startIdx;
-
- // Replace the shorter boundary arc between start and endpoint with the road path.
- function arc(a,b){
-   const r=[a];let k=a;
-   while(k!==b){k=(k+1)%arr.length;r.push(k);if(r.length>arr.length+1)break}
-   return r;
+ // Replace only the direct edge between the two adjacent points.
+ if((b===a+1) || (a===arr.length-1 && b===0)){
+   if(b===a+1){
+     const newArr=arr.slice(0,a+1).concat(path.slice(1,-1),arr.slice(b));
+     if(editorTarget==='territory')territory=newArr;else dnw[Number(editorTarget.slice(3))]=newArr;
+   }else{
+     // Edge from last -> first: rotate the polygon so the edge is internal.
+     const rotated=arr.slice(a).concat(arr.slice(0,a+1));
+     const p=path.slice();
+     const first=rotated[0];
+     const dA=Math.hypot(p[0][0]-first[0],p[0][1]-first[1]);
+     const dB=Math.hypot(p[p.length-1][0]-first[0],p[p.length-1][1]-first[1]);
+     if(dB<dA)p.reverse();
+     const newRot=rotated.slice(0,1).concat(p.slice(1,-1),rotated.slice(1));
+     const cut=newRot.length-1;
+     const newArr=newRot.slice(cut).concat(newRot.slice(0,cut));
+     if(editorTarget==='territory')territory=newArr;else dnw[Number(editorTarget.slice(3))]=newArr;
+   }
+ }else if(a===b+1){
+   // Reverse order and reuse the adjacent-edge case.
+   selectedPointIndices=[b,a];
+   pendingRoad={aIndex:b,bIndex:a,coords:path.slice().reverse()};
+   $('roadName').textContent='Reverse the selected points: tap Add Road Segment again.';
+   return;
  }
- const arcForward=arc(actualStart,actualEnd);
- const arcBackward=arc(actualEnd,actualStart);
- const useForward=arcForward.length<=arcBackward.length;
-
- let newArr;
- if(useForward){
-   // Keep start, add road path, then keep boundary after endpoint.
-   const before=arr.slice(0,actualStart+1);
-   const after=arr.slice(actualEnd);
-   newArr=before.concat(path.slice(1,-1),[endPoint],after);
- }else{
-   path.reverse();
-   const before=arr.slice(0,actualEnd+1);
-   const after=arr.slice(actualStart);
-   newArr=before.concat(path.slice(1,-1),after);
- }
-
- if(newArr.length>=3){
-   if(editorTarget==='territory')territory=newArr;else dnw[Number(editorTarget.slice(3))]=newArr;
-   currentLayer().setLatLngs(newArr);
-   makeHandles();
- }
+ currentLayer().setLatLngs(currentArray());
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
- roadStart=null;pendingRoad=null;
- handles.forEach(x=>x.setOpacity(1));
- $('roadName').textContent='Segment added. STEP 1: tap the next blue boundary handle.';
- banner('FOLLOW ROAD: TAP THE NEXT BLUE BOUNDARY HANDLE');
+ pendingRoad=null;
+ selectedPointIndices=[];
+ makeHandles();
+ $('roadName').textContent='Segment added. STEP 1: tap the next blue point.';
+ banner('FOLLOW ROAD: TAP THE NEXT POINT');
 });
+
+function buildingStyle(status){
+ return {color:'#666',weight:1,fillColor:status==='worked'?'#34c759':status==='nothome'?'#ffcc00':status==='return'?'#007aff':status==='dnc'?'#8e8e93':'#c7c7cc',fillOpacity:status?.62:.16};
+}
 function buildingStyle(status){
  return {color:'#666',weight:1,fillColor:status==='worked'?'#34c759':status==='nothome'?'#ffcc00':status==='return'?'#007aff':status==='dnc'?'#8e8e93':'#c7c7cc',fillOpacity:status?.62:.16};
 }

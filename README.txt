@@ -1,12 +1,15 @@
-Version 9 — Follow Road workflow fix.
+Version 10 — point-first Follow Road workflow.
 
-Follow Road now has a clear sequence:
-1. Tap a blue boundary handle to choose START.
-2. Tap the next intersection on the red boundary.
-3. Review the blue road preview.
-4. Tap Add Road Segment.
-5. Repeat from the new blue boundary handle.
+New workflow:
+1. Use Add Point to place blue points at all desired intersections/corners.
+2. Enter Follow Road.
+3. Tap two adjacent blue points in order.
+4. Review the blue road preview.
+5. Tap Add Road Segment.
+6. Repeat with the next adjacent pair.
 
-Boundary handles now respond to clicks while Follow Road is active.
-The endpoint is snapped to the nearest existing boundary section, rather than requiring an exact pre-existing vertex.
-The old “both ends must be near the existing boundary” failure mode is removed.
+Also includes:
+- Delete Selected: tap a blue point, then delete it.
+- Delete Last remains available.
+- Freehand dragging remains available.
+- Follow Road will not accept non-adjacent points, preventing runaway polygon geometry.
