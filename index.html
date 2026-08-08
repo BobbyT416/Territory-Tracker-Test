@@ -48,8 +48,10 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <div class="sheetTitle" id="editorTitle">Edit Territory</div>
 <div class="small" id="editorHelp">EDITING ORDER: 1) Add Point at each intersection. 2) Follow Road. 3) Tap two blue points in order. 4) Review the blue road preview. 5) Tap Add Road Segment.</div>
 <div id="dnwChooser" style="display:none;margin-top:8px">
-<label class="small" for="dnwSelect">Do Not Work area</label>
-<select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px"></select>
+<div class="small" style="margin-bottom:6px"><strong>Tip:</strong> tap a yellow area on the map first, or choose it below.</div><label class="small" for="dnwSelect">Do Not Work area</label>
+<select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px"></select><label class="small" for="dnwName" style="display:block;margin-top:7px">Area name</label>
+<input id="dnwName" type="text" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px" placeholder="e.g. Republic">
+<button id="saveDNWName" style="margin-top:7px">Save Area Name</button>
 </div>
 <div id="dnwAddHelp" class="small" style="display:none;margin-top:8px">
 <strong>Add Do Not Work Area:</strong> tap the map to place Point 1, Point 2, Point 3… in order. When you have at least 3 points, tap <strong>Finish Area</strong>.
@@ -103,6 +105,9 @@ const defaultDNW=[
 ];
 let geometry=JSON.parse(localStorage.getItem('tt_geometry_stable')||'null')||{territory:defaultTerritory,dnw:defaultDNW};
 let territory=geometry.territory, dnw=geometry.dnw;
+let dnwNames=JSON.parse(localStorage.getItem('tt_dnw_names_v1')||'null');
+if(!Array.isArray(dnwNames)) dnwNames=dnw.map((_,i)=>i===0?'Do Not Work Area 1':i===1?'Do Not Work Area 2':`Do Not Work Area ${i+1}`);
+while(dnwNames.length<dnw.length) dnwNames.push(`Do Not Work Area ${dnwNames.length+1}`);
 const territoryLayer=L.polygon(territory,{color:'transparent',weight:0,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
 let territoryOutline=L.polyline([], {color:'#d71920',weight:3,opacity:.9,interactive:false}).addTo(map);
 
@@ -169,18 +174,24 @@ function ensureDNWLayer(idx){
   if(dnwLayers[idx]) return dnwLayers[idx];
   const layer=L.polygon(dnw[idx]||[],{
     color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48
-  }).addTo(map).bindTooltip(`Do Not Work — Area ${idx+1}`);
+  }).addTo(map);
+  layer.bindTooltip(dnwNames[idx]||`Do Not Work Area ${idx+1}`,{sticky:true});
+  layer.on('click',()=>{
+    if(editMode)return;
+    activeDNWIndex=idx;
+    dnwLayers.forEach((x,i)=>{if(x)x.setStyle({weight:i===idx?4:2,fillOpacity:i===idx?.60:.38})});
+    banner(`SELECTED: ${dnwNames[idx]||`Do Not Work Area ${idx+1}`} — tap Edit Do Not Work`);
+  });
   dnwLayers[idx]=layer;
   return layer;
 }
 
+dnw.forEach((_,i)=>ensureDNWLayer(i));
 function refreshDNWChooser(){
-  const sel=$('dnwSelect');
-  sel.innerHTML='';
+  const sel=$('dnwSelect'); sel.innerHTML='';
   dnw.forEach((_,i)=>{
     const o=document.createElement('option');
-    o.value='dnw'+i;
-    o.textContent=`Do Not Work Area ${i+1}`;
+    o.value='dnw'+i; o.textContent=dnwNames[i]||`Do Not Work Area ${i+1}`;
     sel.appendChild(o);
   });
   if(activeDNWIndex!==null && dnw[activeDNWIndex]) sel.value='dnw'+activeDNWIndex;
@@ -267,7 +278,7 @@ function closeEditor(save){
   territory=original.territory;dnw=original.dnw;
   refreshTerritoryDisplay();dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);
  }
- if(save)localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+ if(save){localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw})); localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));}
  stopRoadMode();
  if(!save && addingDNW && activeDNWIndex!==null && dnw[activeDNWIndex]?.length===0){
    map.removeLayer(dnwLayers[activeDNWIndex]); dnw.splice(activeDNWIndex,1); dnwLayers.splice(activeDNWIndex,1);
@@ -289,7 +300,8 @@ function setActiveDNW(idx){
   $('dnwAddHelp').style.display='none';
   $('finishDNW').style.display='none';
   $('deleteDNWArea').style.display='inline-block';
-  $('editorTitle').textContent=`Edit Do Not Work Area ${idx+1}`;
+  $('editorTitle').textContent=`Edit Do Not Work — ${dnwNames[idx]||`Area ${idx+1}`}`;
+  $('dnwName').value=dnwNames[idx]||`Do Not Work Area ${idx+1}`;
   $('editorHelp').textContent='You are editing ONLY this Do Not Work area. The blue points belong to the selected area.';
   dnwLayers.forEach((layer,i)=>{ if(layer) layer.setStyle({fillOpacity:i===idx?.62:.10,weight:i===idx?3:1}); });
   makeHandles();
@@ -309,11 +321,28 @@ $('dnwSelect').addEventListener('change',()=>{
   setActiveDNW(Number($('dnwSelect').value.slice(3)));
 });
 
+$('saveDNWName').addEventListener('click',()=>{
+  if(activeDNWIndex===null)return;
+  const name=$('dnwName').value.trim();
+  if(!name){banner('Enter a name first');return}
+  dnwNames[activeDNWIndex]=name;
+  localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
+  if(dnwLayers[activeDNWIndex]){
+    dnwLayers[activeDNWIndex].unbindTooltip();
+    dnwLayers[activeDNWIndex].bindTooltip(name,{sticky:true});
+  }
+  refreshDNWChooser();
+  $('dnwSelect').value='dnw'+activeDNWIndex;
+  $('editorTitle').textContent=`Edit Do Not Work — ${name}`;
+  banner(`AREA RENAMED: ${name}`);
+});
+
 function beginAddDNW(){
   original=JSON.parse(JSON.stringify({territory,dnw}));
   editMode=true; addingDNW=true; addMode=false; roadMode=false;
   const idx=dnw.length;
-  dnw.push([]);
+  dnw.push([]); dnwNames.push(`Do Not Work Area ${idx+1}`);
+  localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
   activeDNWIndex=idx; editorTarget='dnw'+idx;
   ensureDNWLayer(idx);
   $('editor').classList.add('show');
@@ -322,6 +351,7 @@ function beginAddDNW(){
   $('finishDNW').style.display='inline-block';
   $('deleteDNWArea').style.display='inline-block';
   $('editorTitle').textContent=`Add Do Not Work Area ${idx+1}`;
+  $('dnwName').value=dnwNames[idx];
   $('editorHelp').textContent='Tap the map to place each boundary point. Add at least 3 points, then tap Finish Area.';
   clearHandles();
   banner('ADD DO NOT WORK AREA: TAP POINT 1');
@@ -353,12 +383,12 @@ $('deleteDNWArea').addEventListener('click',()=>{
   if(!confirm(`Delete Do Not Work Area ${idx+1}?`)) return;
 
   if(dnwLayers[idx]) map.removeLayer(dnwLayers[idx]);
-  dnw.splice(idx,1); dnwLayers.splice(idx,1);
+  dnw.splice(idx,1); dnwLayers.splice(idx,1); dnwNames.splice(idx,1); localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
 
   dnwLayers.forEach((layer,i)=>{
     if(layer){
       layer.unbindTooltip();
-      layer.bindTooltip(`Do Not Work — Area ${i+1}`);
+      layer.bindTooltip(dnwNames[i]||`Do Not Work Area ${i+1}`,{sticky:true});
       layer.setLatLngs(dnw[i]||[]);
     }
   });

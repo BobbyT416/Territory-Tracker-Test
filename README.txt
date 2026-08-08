@@ -1,8 +1,9 @@
-Version 17 — Do Not Work area deletion fix.
+Version 18 — independent Do Not Work selection and naming.
 
-- Removes the old hard-coded green Do Not Work area from the starting map.
-- Existing Do Not Work areas are independent.
-- Edit Do Not Work opens the selected actual area rather than a hard-coded first area.
-- Delete This Area removes the selected area.
-- Add Do Not Work Area creates a new independent polygon.
-- Remaining areas are reindexed safely after deletion.
+- Tap a yellow Do Not Work polygon on the map to select it, then Edit Do Not Work edits that exact area.
+- The selected area is highlighted.
+- Do Not Work areas have editable names.
+- Names appear as map labels/tooltips and in the edit selector.
+- Add Do Not Work Area creates a new independent polygon with its own name.
+- Delete This Area removes only the selected area.
+- Names persist separately from geometry.
