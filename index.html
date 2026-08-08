@@ -140,7 +140,7 @@ function refreshTerritoryDisplay(){
 }
 refreshTerritoryDisplay();
 
-const dnwLayers=dnw.map((p,i)=>L.polygon(p,{color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}).addTo(map).bindTooltip(i?'Do Not Work — Cardale':'Do Not Work — Republic'));
+const dnwLayers=[];
 
 
 let housesVisible=true, houseLayer=L.layerGroup().addTo(map);
@@ -164,13 +164,23 @@ function currentLayer(){
   const idx=currentDNWIndex();
   return editorTarget==='territory'?territoryLayer:dnwLayers[idx];
 }
+
+function ensureDNWLayer(idx){
+  if(dnwLayers[idx]) return dnwLayers[idx];
+  const layer=L.polygon(dnw[idx]||[],{
+    color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48
+  }).addTo(map).bindTooltip(`Do Not Work — Area ${idx+1}`);
+  dnwLayers[idx]=layer;
+  return layer;
+}
+
 function refreshDNWChooser(){
   const sel=$('dnwSelect');
   sel.innerHTML='';
   dnw.forEach((_,i)=>{
     const o=document.createElement('option');
     o.value='dnw'+i;
-    o.textContent=`Area ${i+1}${i===0?' — Republic':i===1?' — Cardale':''}`;
+    o.textContent=`Do Not Work Area ${i+1}`;
     sel.appendChild(o);
   });
   if(activeDNWIndex!==null && dnw[activeDNWIndex]) sel.value='dnw'+activeDNWIndex;
@@ -272,21 +282,16 @@ function setActiveDNW(idx){
   if(idx<0 || idx>=dnw.length)return;
   activeDNWIndex=idx;
   editorTarget='dnw'+idx;
-  addingDNW=false;
-  editMode=true;
-  addMode=false;
-  roadMode=false;
+  addingDNW=false; editMode=true; addMode=false; roadMode=false;
+  ensureDNWLayer(idx);
   refreshDNWChooser();
   $('dnwChooser').style.display='block';
   $('dnwAddHelp').style.display='none';
   $('finishDNW').style.display='none';
-  $('deleteDNWArea').style.display=dnw.length>1?'inline-block':'none';
-  $('editorTitle').textContent=`Edit Do Not Work — Area ${idx+1}`;
-  $('editorHelp').textContent='You are editing ONLY the selected Do Not Work area. Drag its blue points, add points, delete points, or use Follow Road. Other yellow areas will not be changed.';
-  dnwLayers.forEach((layer,i)=>layer.setStyle({
-    fillOpacity:i===idx?.62:.12,
-    weight:i===idx?3:1
-  }));
+  $('deleteDNWArea').style.display='inline-block';
+  $('editorTitle').textContent=`Edit Do Not Work Area ${idx+1}`;
+  $('editorHelp').textContent='You are editing ONLY this Do Not Work area. The blue points belong to the selected area.';
+  dnwLayers.forEach((layer,i)=>{ if(layer) layer.setStyle({fillOpacity:i===idx?.62:.10,weight:i===idx?3:1}); });
   makeHandles();
   banner(`EDITING DO NOT WORK AREA ${idx+1}`);
 }
@@ -294,11 +299,9 @@ function setActiveDNW(idx){
 $('editDNW').addEventListener('click',()=>{
   original=JSON.parse(JSON.stringify({territory,dnw}));
   $('editor').classList.add('show');
-  if(!dnw.length){
-    beginAddDNW();
-    return;
-  }
-  setActiveDNW(0);
+  if(!dnw.length){ beginAddDNW(); return; }
+  activeDNWIndex = activeDNWIndex!==null && activeDNWIndex<dnw.length ? activeDNWIndex : dnw.length-1;
+  setActiveDNW(activeDNWIndex);
 });
 
 $('dnwSelect').addEventListener('change',()=>{
@@ -311,17 +314,13 @@ function beginAddDNW(){
   editMode=true; addingDNW=true; addMode=false; roadMode=false;
   const idx=dnw.length;
   dnw.push([]);
-  const layer=L.polygon([],{
-    color:'#b8860b',weight:3,fillColor:'#ffd54f',fillOpacity:.48
-  }).addTo(map).bindTooltip(`Do Not Work — Area ${idx+1}`);
-  dnwLayers.push(layer);
-  activeDNWIndex=idx;
-  editorTarget='dnw'+idx;
+  activeDNWIndex=idx; editorTarget='dnw'+idx;
+  ensureDNWLayer(idx);
   $('editor').classList.add('show');
   $('dnwChooser').style.display='none';
   $('dnwAddHelp').style.display='block';
   $('finishDNW').style.display='inline-block';
-  $('deleteDNWArea').style.display='none';
+  $('deleteDNWArea').style.display='inline-block';
   $('editorTitle').textContent=`Add Do Not Work Area ${idx+1}`;
   $('editorHelp').textContent='Tap the map to place each boundary point. Add at least 3 points, then tap Finish Area.';
   clearHandles();
@@ -347,19 +346,36 @@ $('finishDNW').addEventListener('click',()=>{
 });
 
 $('deleteDNWArea').addEventListener('click',()=>{
-  if(activeDNWIndex===null || dnw.length<=1){
-    banner('KEEP AT LEAST ONE DO NOT WORK AREA');
-    return;
+  if(activeDNWIndex===null || activeDNWIndex<0 || activeDNWIndex>=dnw.length){
+    banner('SELECT A DO NOT WORK AREA FIRST'); return;
   }
   const idx=activeDNWIndex;
-  map.removeLayer(dnwLayers[idx]);
-  dnw.splice(idx,1);
-  dnwLayers.splice(idx,1);
-  activeDNWIndex=Math.max(0,Math.min(idx,dnw.length-1));
-  editorTarget='dnw'+activeDNWIndex;
-  refreshDNWChooser();
-  setActiveDNW(activeDNWIndex);
-  banner('DO NOT WORK AREA DELETED');
+  if(!confirm(`Delete Do Not Work Area ${idx+1}?`)) return;
+
+  if(dnwLayers[idx]) map.removeLayer(dnwLayers[idx]);
+  dnw.splice(idx,1); dnwLayers.splice(idx,1);
+
+  dnwLayers.forEach((layer,i)=>{
+    if(layer){
+      layer.unbindTooltip();
+      layer.bindTooltip(`Do Not Work — Area ${i+1}`);
+      layer.setLatLngs(dnw[i]||[]);
+    }
+  });
+
+  activeDNWIndex=dnw.length ? Math.min(idx,dnw.length-1) : null;
+  clearHandles();
+
+  if(activeDNWIndex===null){
+    $('dnwChooser').style.display='none';
+    $('deleteDNWArea').style.display='none';
+    $('editorTitle').textContent='Do Not Work';
+    banner('DO NOT WORK AREA DELETED');
+  }else{
+    refreshDNWChooser();
+    setActiveDNW(activeDNWIndex);
+    banner('DO NOT WORK AREA DELETED');
+  }
 });
 
 $('freehand').addEventListener('click',()=>{
@@ -633,7 +649,7 @@ loadHouses();
  if(idx===null)return;
  // Reset means clear the selected area so the user can rebuild it accurately.
  dnw[idx]=[];
- currentLayer().setLatLngs([]);
+ ensureDNWLayer(idx).setLatLngs([]);
  clearHandles();
  addingDNW=true;
  $('finishDNW').style.display='inline-block';
