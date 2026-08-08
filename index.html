@@ -827,10 +827,24 @@ let cardMode=false;
 let savedMapView=null;
 const cardBounds=[[39.946,-79.907],[39.982,-79.842]];
 
+
+function setCardLabelVisibility(visible){
+  if(typeof dnwLabelLayers==='undefined') return;
+  dnwLabelLayers.forEach(function(layer){
+    if(!layer) return;
+    if(visible){
+      if(!map.hasLayer(layer)) layer.addTo(map);
+    }else{
+      if(map.hasLayer(layer)) map.removeLayer(layer);
+    }
+  });
+}
+
 function enterCardMode(){
   if(cardMode)return;
   cardMode=true;
   savedMapView={center:map.getCenter(),zoom:map.getZoom()};
+  setCardLabelVisibility(false);
   // Show the original territory card as an opaque card, not as a faded overlay.
   cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',cardBounds,{
     opacity:1,
@@ -850,6 +864,7 @@ function enterLiveMapMode(){
     map.removeLayer(cardOverlay);
     cardOverlay=null;
   }
+  setCardLabelVisibility(true);
   $('card').textContent='🗺️ Territory Card';
   banner('');
   if(savedMapView){

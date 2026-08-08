@@ -1,7 +1,7 @@
-Version 24 — Territory Card / Live Map toggle.
+Version 25 — MINIMAL change from exact Version 24.
 
-- Territory Card button now switches to a full, opaque view of the original card.
-- The card is fit to the map viewport so the card is actually readable.
-- While the card is displayed, the button changes to Live Map.
-- Tapping Live Map removes the card and restores the previous live-map center/zoom.
-- The card is no longer shown as a faint transparent overlay over the live map.
+Only change:
+- Hide the live-map Do Not Work center labels while Territory Card is displayed.
+- Restore those labels when Live Map is restored.
+
+No other code, geometry, controls, house functions, editing functions, or saved data behavior was changed.
