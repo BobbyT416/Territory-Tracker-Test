@@ -98,7 +98,43 @@ const defaultDNW=[
 ];
 let geometry=JSON.parse(localStorage.getItem('tt_geometry_stable')||'null')||{territory:defaultTerritory,dnw:defaultDNW};
 let territory=geometry.territory, dnw=geometry.dnw;
-const territoryLayer=L.polygon(territory,{color:'#d71920',weight:4,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
+const territoryLayer=L.polygon(territory,{color:'transparent',weight:0,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
+let territoryOutline=L.polyline([], {color:'#d71920',weight:3,opacity:.9,interactive:false}).addTo(map);
+
+function offsetBoundary(points, meters=10){
+  if(points.length<3)return points;
+  // Determine polygon winding in lon/lat coordinates.
+  let area=0;
+  for(let i=0;i<points.length;i++){
+    const a=points[i],b=points[(i+1)%points.length];
+    area += a[1]*b[0]-b[1]*a[0];
+  }
+  const ccw=area>0;
+  const lat0=points.reduce((s,p)=>s+p[0],0)/points.length;
+  const metersLat=1/111320;
+  const metersLon=1/(111320*Math.cos(lat0*Math.PI/180));
+  const out=[];
+  for(let i=0;i<points.length;i++){
+    const prev=points[(i-1+points.length)%points.length], cur=points[i], next=points[(i+1)%points.length];
+    const e1=[next[1]-cur[1],next[0]-cur[0]];
+    const e0=[cur[1]-prev[1],cur[0]-prev[0]];
+    const len1=Math.hypot(e1[0],e1[1])||1, len0=Math.hypot(e0[0],e0[1])||1;
+    const n1=ccw?[e1[1]/len1,-e1[0]/len1]:[-e1[1]/len1,e1[0]/len1];
+    const n0=ccw?[e0[1]/len0,-e0[0]/len0]:[-e0[1]/len0,e0[0]/len0];
+    let nx=n0[0]+n1[0],ny=n0[1]+n1[1],nl=Math.hypot(nx,ny)||1;
+    nx/=nl;ny/=nl;
+    out.push([cur[0]+ny*meters*metersLat,cur[1]+nx*meters*metersLon]);
+  }
+  out.push(out[0]);
+  return out;
+}
+function refreshTerritoryDisplay(){
+  territoryLayer.setLatLngs(territory);
+  territoryOutline.setLatLngs(offsetBoundary(territory,10));
+  territoryOutline.bringToFront();
+}
+refreshTerritoryDisplay();
+
 const dnwLayers=dnw.map((p,i)=>L.polygon(p,{color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}).addTo(map).bindTooltip(i?'Do Not Work — Cardale':'Do Not Work — Republic'));
 
 
@@ -123,7 +159,7 @@ function makeHandles(){
    h._pointIndex=i;
    h.on('drag',e=>{
      arr[i]=[e.latlng.lat,e.latlng.lng];
-     currentLayer().setLatLngs(arr);
+     currentLayer().setLatLngs(arr); if(editorTarget==='territory')refreshTerritoryDisplay();
    });
    h.on('click',()=>{
      if(!editMode)return;
@@ -180,14 +216,14 @@ function startEdit(target){
  $('editor').classList.add('show');
  $('dnwChooser').style.display=target==='territory'?'none':'block';
  $('editorTitle').textContent=target==='territory'?'Edit Territory':target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale';
- $('editorHelp').textContent='Add all blue intersection points first. Then Follow Road: tap Point 1 → tap Point 2 → review blue preview → Add Road Segment. Repeat Point 2 → Point 3.';
+ $('editorHelp').textContent='The red boundary line is displayed about 10 m outside the actual boundary so road names stay readable. Blue points remain on the true boundary.';
  $('freehand').classList.add('active'); $('followRoad').classList.remove('active');
  makeHandles(); banner('EDITING '+$('editorTitle').textContent.toUpperCase());
 }
 function closeEditor(save){
  if(!save&&original){
   territory=original.territory;dnw=original.dnw;
-  territoryLayer.setLatLngs(territory);dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);
+  refreshTerritoryDisplay();dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);
  }
  if(save)localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
  stopRoadMode();clearHandles();editMode=false;addMode=false;original=null;
@@ -222,7 +258,7 @@ $('deleteSelected').addEventListener('click',()=>{
  }
  const arr=currentArray();
  if(arr.length<=3){banner('A BOUNDARY NEEDS AT LEAST 3 POINTS');return}
- arr.splice(idx,1);currentLayer().setLatLngs(arr);
+ arr.splice(idx,1);currentLayer().setLatLngs(arr); if(editorTarget==='territory')refreshTerritoryDisplay();
  window.selectedFreehandIndex=null;selectedPointIndices=[];
  makeHandles();banner('POINT DELETED');
 });
@@ -230,7 +266,7 @@ $('deleteSelected').addEventListener('click',()=>{
 $('deletePoint').addEventListener('click',()=>{
  if(!editMode)return;
  const arr=currentArray();if(arr.length<=3){banner('A BOUNDARY NEEDS AT LEAST 3 POINTS');return}
- arr.pop();currentLayer().setLatLngs(arr);window.selectedFreehandIndex=null;makeHandles();
+ arr.pop();currentLayer().setLatLngs(arr); if(editorTarget==='territory')refreshTerritoryDisplay();window.selectedFreehandIndex=null;makeHandles();
  banner('LAST POINT DELETED');
 });
 $('saveEdit').addEventListener('click',()=>closeEditor(true));
@@ -250,7 +286,7 @@ map.on('click',e=>{
  if(!editMode)return;
  if(addMode){
   const arr=currentArray(),p=[e.latlng.lat,e.latlng.lng],idx=nearestSegmentIndex(arr,p);
-  arr.splice(idx+1,0,p);currentLayer().setLatLngs(arr);addMode=false;makeHandles();
+  arr.splice(idx+1,0,p);currentLayer().setLatLngs(arr); if(editorTarget==='territory')refreshTerritoryDisplay();addMode=false;makeHandles();
   banner('POINT ADDED — ADD THE NEXT INTERSECTION');
   return;
  }
@@ -386,7 +422,7 @@ $('roadAdd').addEventListener('click',()=>{
    $('roadName').textContent='Reverse the selected points: tap Add Road Segment again.';
    return;
  }
- currentLayer().setLatLngs(currentArray());
+ currentLayer().setLatLngs(currentArray()); if(editorTarget==='territory')refreshTerritoryDisplay();
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
  pendingRoad=null;
  selectedPointIndices=[];

@@ -1,9 +1,4 @@
-Version 12 — Follow Road preview fix.
+Version 13 — offset boundary display.
 
-Changes:
-- The road preview now first tries the exact two points selected by the user.
-- If needed, it falls back to snapping the points to the nearest road.
-- The blue preview is thicker, dashed, brought to the front, and cannot be hidden by map layers.
-- A Preview Road button lets the user retry the preview.
-- Add Road Segment stays disabled until a blue preview actually exists.
-- Clear status messages explain whether the road was found.
+The territory fill still uses the true boundary coordinates. The red boundary line is now drawn approximately 10 meters OUTSIDE the actual boundary, so street names and road centerlines remain visible.
+Editing points remain on the true boundary. Changes to the territory automatically refresh the offset red outline.
