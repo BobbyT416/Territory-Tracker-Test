@@ -1,11 +1,11 @@
-Version 15 — Do Not Work editor fix.
+Version 16 — independent Do Not Work areas.
 
-Focused changes:
-- Do Not Work editor explicitly lets the user choose Republic or Cardale.
-- Blue edit handles are raised above map polygons and are easier to drag/select.
-- Selected points are highlighted.
-- Added Reset This Area for a clean starting shape if the current area is badly misplaced.
-- Editing instructions explain dragging, adding, and deleting points.
-- Normal Do Not Work styling is restored after closing the editor.
-
-The initial Do Not Work coordinates are still only a starting approximation; the editor is intended to let the user place them accurately against the actual territory card/map.
+Key fixes:
+- Each Do Not Work area has its own active index and edit layer.
+- Add Point can only modify the currently selected area.
+- The editor explicitly highlights the selected area and dims the others.
+- Added “Add Do Not Work Area” to create additional independent polygons.
+- New area workflow: tap map points -> Finish Area -> drag/delete/follow road as needed.
+- Added Delete This Area for removing an unwanted area.
+- Reset This Area now clears only the selected area so it can be rebuilt accurately.
+- Existing Republic/Cardale areas remain separate and editable.
