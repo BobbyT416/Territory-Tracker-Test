@@ -276,7 +276,9 @@ function refreshDNWLabel(idx){
       iconAnchor:[0,0]
     })
   }).addTo(map);
-  if(cardMode && dnwLabelLayers[idx]) map.removeLayer(dnwLabelLayers[idx]);
+  if(cardMode && dnwLabelLayers[idx] && map.hasLayer(dnwLabelLayers[idx])){
+    map.removeLayer(dnwLabelLayers[idx]);
+  }
 }
 function refreshAllDNWLabels(){
   dnw.forEach((_,i)=>refreshDNWLabel(i));
@@ -829,8 +831,9 @@ let savedMapView=null;
 const cardBounds=[[39.946,-79.907],[39.982,-79.842]];
 
 function setDNWLabelsVisible(visible){
+  if(!Array.isArray(dnwLabelLayers)) return;
   dnwLabelLayers.forEach(layer=>{
-    if(!layer)return;
+    if(!layer) return;
     if(visible){
       if(!map.hasLayer(layer)) layer.addTo(map);
     }else{
@@ -843,8 +846,8 @@ function enterCardMode(){
   if(cardMode)return;
   cardMode=true;
   savedMapView={center:map.getCenter(),zoom:map.getZoom()};
-  // Show the original territory card as an opaque card, not as a faded overlay.
   setDNWLabelsVisible(false);
+  // Show the original territory card as an opaque card, not as a faded overlay.
   cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',cardBounds,{
     opacity:1,
     interactive:false,

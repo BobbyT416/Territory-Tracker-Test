@@ -1,6 +1,8 @@
-Version 25 — clean Territory Card view.
+Version 26 — based directly on Version 24.
 
-- Live-map Do Not Work labels are hidden while Territory Card is displayed.
-- The original territory card is shown without live-map Do Not Work labels over it.
-- Returning to Live Map restores the Do Not Work labels.
-- If a label refresh occurs while the card is displayed, it remains hidden until Live Map mode is restored.
+Only change from Version 24:
+- Hide live-map Do Not Work center labels while Territory Card is displayed.
+- Restore the labels when returning to Live Map.
+
+No Do Not Work geometry, names, cleanup logic, or localStorage data handling was changed.
+This is intentionally based on Version 24 because Version 24 had the working Territory Card and the user's existing Do Not Work data.
