@@ -16,7 +16,7 @@
 .legend{text-align:center;color:#666;font-size:10px;margin-top:7px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 7px;vertical-align:-1px}
 #editor,#houseSheet{display:none;position:fixed;left:10px;right:10px;top:82px;bottom:auto;background:#fff;border-radius:16px;box-shadow:0 4px 20px #0004;padding:14px;z-index:10000;max-height:52vh;overflow:auto}
 .show{display:block!important}.editorBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.editorBtns button,.roadBtns button{border:0;border-radius:10px;padding:11px 5px;font-weight:700;background:#e5e5ea}.editorBtns .active,.roadBtns .primary{background:#007aff;color:#fff}
-.roadControls{display:none;margin-top:10px;padding:10px;background:#f2f2f7;border:1px solid #d1d1d6;border-radius:12px;position:relative;z-index:10001}.roadBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.roadControls{display:none;margin-top:10px;padding:10px;background:#f2f2f7;border:1px solid #d1d1d6;border-radius:12px;position:relative;z-index:10001}.roadBtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:8px}
 .small{font-size:12px;color:#666}.sheetTitle{font-size:19px;font-weight:700}.statuses{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:12px 0}.statuses button{border:0;border-radius:10px;padding:10px 3px;font-weight:700}
 textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding:9px;font:inherit}.save{width:100%;border:0;border-radius:11px;background:#007aff;color:#fff;padding:12px;margin-top:8px;font-weight:700}
 #banner{display:none;position:absolute;top:86px;left:10px;right:10px;background:#fff;border-radius:12px;padding:9px;text-align:center;font-size:12px;font-weight:700;box-shadow:0 2px 10px #0003;z-index:25}
@@ -65,7 +65,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <div class="small">FOLLOW ROAD: tap Point 1 → tap Point 2 → review the blue line → tap Add Road Segment.</div>
 <div id="roadName" style="font-weight:700;font-size:13px;margin-top:5px">Ready.</div>
 <div class="roadBtns">
-<button id="roadAdd" class="primary">Add Road Segment</button>
+<button id="roadPreviewBtn">🔎 Preview Road</button><button id="roadAdd" class="primary" disabled style="opacity:.5">Add Road Segment</button>
 <button id="roadCancel">Cancel Road</button>
 </div>
 </div>
@@ -168,7 +168,7 @@ function clearPointSelection(){
  handles.forEach(h=>h.setOpacity(.65));
 }
 function stopRoadMode(){
- roadMode=false; selectedPointIndices=[]; pendingRoad=null;
+ roadMode=false; selectedPointIndices=[]; pendingRoad=null; $('roadAdd').disabled=true; $('roadAdd').style.opacity='.5';
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
  $('roadControls').style.display='none';
  handles.forEach(h=>h.setOpacity(1));
@@ -261,6 +261,7 @@ $('followRoad').addEventListener('click',()=>{
  addMode=false;roadMode=true;selectedPointIndices=[];pendingRoad=null;
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
  $('roadControls').style.display='block';
+ $('roadAdd').disabled=true; $('roadAdd').style.opacity='.5';
  $('followRoad').classList.add('active');$('freehand').classList.remove('active');
  makeHandles();
  $('roadName').textContent='STEP 1: Tap the first blue point.';
@@ -286,33 +287,65 @@ async function roadLabel(lat,lng){
 
 async function prepareRoadPreview(){
  const arr=currentArray(),aIndex=selectedPointIndices[0],bIndex=selectedPointIndices[1];
- // The two points must be adjacent in the polygon. This keeps the polygon valid.
  const adjacent=(Math.abs(aIndex-bIndex)===1)||(Math.abs(aIndex-bIndex)===arr.length-1);
  if(!adjacent){
-  $('roadName').textContent='Those points are not next to each other. Tap adjacent points in boundary order.';
-  banner('FOLLOW ROAD: CHOOSE ADJACENT POINTS');
+  $('roadName').textContent='Those two points are not adjacent in the boundary. Tap the next point in order.';
+  banner('FOLLOW ROAD: POINTS MUST BE NEXT TO EACH OTHER');
   selectedPointIndices.pop();
   return;
  }
+
+ const a=arr[aIndex], b=arr[bIndex];
+ $('roadName').textContent='Finding the road between Point 1 and Point 2…';
+ banner('FOLLOW ROAD: FINDING ROAD…');
+
  try{
-  const a=arr[aIndex],b=arr[bIndex];
-  const sa=await snapPoint(a[0],a[1]),sb=await snapPoint(b[0],b[1]);
-  const route=await routeSegment(sa,sb);
+  // First try the exact points the user selected. This avoids the previous
+  // failure where the nearest-road snap moved a point to an unintended road.
+  let route=null;
+  try{
+   const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}.json?overview=full&geometries=geojson&steps=true`);
+   if(r.ok){
+    const j=await r.json();
+    if(j.code==='Ok' && j.routes?.length) route=j.routes[0];
+   }
+  }catch(e){}
+
+  // If the exact points do not route, try snapping each point to the nearest road.
+  if(!route){
+   const sa=await snapPoint(a[0],a[1]), sb=await snapPoint(b[0],b[1]);
+   route=await routeSegment(sa,sb);
+  }
+
+  if(!route || !route.geometry?.coordinates?.length) throw Error('No road geometry');
   if(route.distance>5000){
-   $('roadName').textContent='That route is too long for one boundary segment. Choose the next nearby point.';
+   $('roadName').textContent='The road route is over 5 km. Check that Points 1 and 2 are on the intended nearby road.';
+   banner('FOLLOW ROAD: ROUTE TOO LONG');
    return;
   }
+
   const coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
   if(roadPreview)map.removeLayer(roadPreview);
-  roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.9,dashArray:'10 7'}).addTo(map);
-  pendingRoad={aIndex,bIndex,coords};
-  const name=await roadLabel(sa.lat,sa.lng);
-  $('roadName').textContent=name?`Preview: ${name} — ${Math.round(route.distance)} m`:`Road preview — ${Math.round(route.distance)} m`;
-  banner('STEP 3: REVIEW BLUE LINE, THEN TAP ADD ROAD SEGMENT');
+  roadPreview=L.polyline(coords,{
+    color:'#007aff',weight:8,opacity:1,dashArray:'12 8',
+    lineCap:'round',lineJoin:'round',interactive:false
+  }).addTo(map);
+  roadPreview.bringToFront();
+
+  pendingRoad={aIndex,bIndex,coords}; $('roadAdd').disabled=false; $('roadAdd').style.opacity='1';
+  const name=await roadLabel(a[0],a[1]);
+  $('roadName').textContent=name
+    ? `BLUE PREVIEW: ${name} • ${Math.round(route.distance)} m`
+    : `BLUE PREVIEW READY • ${Math.round(route.distance)} m`;
+  banner('STEP 3 — REVIEW BLUE LINE, THEN TAP ADD ROAD SEGMENT');
  }catch(e){
-  $('roadName').textContent='Could not find a road between those points. Try points on a mapped road.';
+  console.error('Follow Road preview failed:',e);
+  $('roadName').textContent='No road preview could be created. Try points directly on the road/intersection.';
+  banner('FOLLOW ROAD: COULD NOT FIND ROAD');
  }
 }
+
+$('roadPreviewBtn').addEventListener('click',()=>{if(selectedPointIndices.length===2)prepareRoadPreview();else banner('FOLLOW ROAD: SELECT TWO BLUE POINTS FIRST')});
 
 $('roadAdd').addEventListener('click',()=>{
  if(!pendingRoad){

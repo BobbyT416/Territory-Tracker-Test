@@ -1,9 +1,9 @@
-Version 11 — visibility-only fix over Version 10.
-The Version 10 editor was rebuilt from a stable base that used a bottom panel z-index below Leaflet map panes. Version 11 restores the editor panel above the map so all edit controls are visible and clickable.
-Follow Road workflow remains:
-1. Add blue points at intersections.
-2. Follow Road.
-3. Tap adjacent Point 1 and Point 2.
-4. Review preview.
-5. Tap Add Road Segment.
-6. Repeat.
+Version 12 — Follow Road preview fix.
+
+Changes:
+- The road preview now first tries the exact two points selected by the user.
+- If needed, it falls back to snapping the points to the nearest road.
+- The blue preview is thicker, dashed, brought to the front, and cannot be hidden by map layers.
+- A Preview Road button lets the user retry the preview.
+- Add Road Segment stays disabled until a blue preview actually exists.
+- Clear status messages explain whether the road was found.
