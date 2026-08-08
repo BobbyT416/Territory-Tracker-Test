@@ -1,10 +1,4 @@
-Territory Tracker Version 6 test build
-
-Fixes:
-- Fixed the fatal edit-mode JavaScript error that prevented Edit Territory from opening.
-- Follow Road remains inside the Edit Territory / Edit Do Not Work editor.
-- Do Not Work editing now lets you choose Republic or Cardale.
-- Add Point inserts at the exact map click and into the nearest boundary segment.
-- Existing building, houses ON/OFF, notes/status, and map features retained.
-
-This remains a prototype. Initial territory geometry is not certified as the official territory boundary.
+Version 7 — stable control rebuild.
+This version restores all core controls in one coherent script:
+Houses ON/OFF, Edit Territory, Edit Do Not Work, Freehand, Add Point, Follow Road, Save/Cancel, building status and notes.
+Initial territory geometry remains a prototype and must be calibrated against the official territory card.

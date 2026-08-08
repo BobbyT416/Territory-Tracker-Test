@@ -4,320 +4,282 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#007aff">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Territory Tracker">
+<title>Territory Tracker — Stable Test</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<title>Territory Tracker</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Arial;background:#f2f2f7;color:#111}
-.app{height:100vh;display:flex;flex-direction:column}.header{background:#fff;padding:45px 16px 10px;border-bottom:1px solid #ddd;z-index:5}
+.app{height:100vh;display:flex;flex-direction:column}.header{background:#fff;padding:45px 12px 9px;border-bottom:1px solid #ddd;z-index:5}
 .header h1{margin:0;text-align:center;font-size:20px}.header p{text-align:center;margin:3px 0;color:#666;font-size:12px}
-#map{flex:1;min-height:0}.bottom{background:#fff;padding:9px 10px calc(9px + env(safe-area-inset-bottom));box-shadow:0 -2px 12px #0002;z-index:10}
-.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.actions button{border:0;border-radius:10px;padding:10px 5px;font-weight:700;background:#e5e5ea}.actions .blue{background:#007aff;color:#fff}
-.legend{font-size:10px;color:#666;margin-top:7px;text-align:center}.legend span{display:inline-block;margin:0 6px 2px 0}
-.sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-2px;margin-right:3px}.u{background:#c7c7cc}.w{background:#34c759}.nh{background:#ffcc00}.rt{background:#007aff}.dn{background:#8e8e93}
-#sheet,#editor{display:none;position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -5px 25px #0003;padding:17px;z-index:30}
-.show{display:block!important}.sheet h2{margin:0 0 4px;font-size:19px}.small{font-size:12px;color:#666}
-.statuses{display:flex;gap:5px;margin:12px 0}.statuses button{flex:1;border:0;border-radius:10px;padding:10px 3px;font-weight:700}
-.note{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding:9px;font:inherit}.save{width:100%;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#007aff;color:#fff;font-weight:700}
-.editorBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.editorBtns button{border:0;border-radius:10px;padding:11px;font-weight:700;background:#e5e5ea}.editorBtns .primary{background:#007aff;color:#fff}
-#modeBanner{display:none;position:absolute;top:88px;left:10px;right:10px;background:#fff;padding:9px 11px;border-radius:12px;box-shadow:0 2px 10px #0003;z-index:20;text-align:center;font-size:12px;font-weight:700}
+#map{flex:1;min-height:0}.bottom{background:#fff;padding:9px 9px calc(9px + env(safe-area-inset-bottom));box-shadow:0 -2px 12px #0002;z-index:10}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.actions button{border:0;border-radius:10px;padding:10px 4px;font-weight:700;background:#e5e5ea}.actions .blue{background:#007aff;color:#fff}
+.legend{text-align:center;color:#666;font-size:10px;margin-top:7px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 7px;vertical-align:-1px}
+#editor,#houseSheet{display:none;position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px #0003;padding:16px;z-index:40}
+.show{display:block!important}.editorBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}.editorBtns button,.roadBtns button{border:0;border-radius:10px;padding:11px 5px;font-weight:700;background:#e5e5ea}.editorBtns .active,.roadBtns .primary{background:#007aff;color:#fff}
+.roadControls{display:none;margin-top:10px;padding:10px;background:#f2f2f7;border-radius:12px}.roadBtns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.small{font-size:12px;color:#666}.sheetTitle{font-size:19px;font-weight:700}.statuses{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:12px 0}.statuses button{border:0;border-radius:10px;padding:10px 3px;font-weight:700}
+textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding:9px;font:inherit}.save{width:100%;border:0;border-radius:11px;background:#007aff;color:#fff;padding:12px;margin-top:8px;font-weight:700}
+#banner{display:none;position:absolute;top:86px;left:10px;right:10px;background:#fff;border-radius:12px;padding:9px;text-align:center;font-size:12px;font-weight:700;box-shadow:0 2px 10px #0003;z-index:25}
 </style>
 </head>
 <body>
 <div class="app">
-<div class="header"><h1>Territory Tracker</h1><p>Republic / Cardale — Test Version 3</p></div>
-<div id="modeBanner"></div><div id="map"></div>
+<header class="header"><h1>Territory Tracker</h1><p>Republic / Cardale — Stable Test</p></header>
+<div id="banner"></div><div id="map"></div>
 <div class="bottom">
 <div class="actions">
 <button id="houses" class="blue">🏠 Houses ON</button>
 <button id="locate">📍 My Location</button>
 <button id="card">🗺️ Territory Card</button>
-<button id="edit">✏️ Edit Territory</button>
-<button id="dnwEdit">🟨 Edit Do Not Work</button>
+<button id="editTerritory">✏️ Edit Territory</button>
+<button id="editDNW">🟨 Edit Do Not Work</button>
 <button id="remaining">Remaining</button>
 </div>
-<div class="legend"><span><i class="sw u"></i>Unworked</span><span><i class="sw w"></i>Worked</span><span><i class="sw nh"></i>Not Home</span><span><i class="sw rt"></i>Return</span><span><i class="sw dn"></i>Do Not Call</span></div>
+<div class="legend">
+<span><i class="sw" style="background:#c7c7cc"></i>Unworked</span>
+<span><i class="sw" style="background:#34c759"></i>Worked</span>
+<span><i class="sw" style="background:#ffcc00"></i>Not Home</span>
+<span><i class="sw" style="background:#007aff"></i>Return</span>
+</div>
 </div></div>
 
-<div id="sheet">
-<h2 id="house"></h2><div class="small">Status and notes are saved on this device.</div>
-<div class="statuses">
-<button style="background:#dff5e4" data-s="worked">🟢 Worked</button>
-<button style="background:#fff4c7" data-s="nothome">🟡 Not Home</button>
-<button style="background:#dceaff" data-s="return">🔵 Return</button>
-<button style="background:#eee" data-s="dnc">🚫 Do Not Call</button>
-</div>
-<textarea id="note" class="note" placeholder="Add a note..."></textarea>
-<button class="save" id="save">Save Note</button>
-</div>
-
-
-<div id="roadPanel" style="display:none;position:fixed;left:10px;right:10px;bottom:125px;background:#fff;border-radius:16px;box-shadow:0 3px 18px #0003;padding:14px;z-index:25">
-  <div style="font-weight:700;font-size:16px">🛣️ Follow Road</div>
-  <div id="roadHelp" style="font-size:12px;color:#666;margin-top:4px">
-    Tap the road where the boundary should begin. Then tap the intersection where you want to leave that road.
-    The app will snap the points to the road network and draw the boundary along the routed road.
-  </div>
-  <div id="roadName" style="font-size:13px;font-weight:700;margin-top:8px"></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px">
-    <button id="roadCancel" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#e5e5ea">Cancel</button>
-    <button id="roadAdd" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#007aff;color:#fff">Add Road Segment</button>
-  </div>
-</div>
-
-<div id="editor">
-<h2 id="editorTitle">Edit Territory</h2>
-<div class="small" id="editorHelp">Choose how you want to edit this boundary.</div>
+<section id="editor">
+<div class="sheetTitle" id="editorTitle">Edit Territory</div>
+<div class="small" id="editorHelp">Choose Freehand or Follow Road.</div>
 <div id="dnwChooser" style="display:none;margin-top:8px">
-<label for="dnwSelect" style="font-size:12px;font-weight:700">Do Not Work area</label>
-<select id="dnwSelect" style="width:100%;margin-top:4px;border:1px solid #ccc;border-radius:9px;padding:9px">
+<label class="small" for="dnwSelect">Area</label>
+<select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px">
 <option value="dnw0">Republic</option><option value="dnw1">Cardale</option>
 </select>
 </div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px">
-<button id="freehand" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#e5e5ea">✏️ Freehand</button>
-<button id="followRoad" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#007aff;color:#fff">🛣️ Follow Road</button>
-</div>
 <div class="editorBtns">
-<button id="addPoint">➕ Add Point</button><button id="deletePoint">➖ Delete Last</button>
-<button id="saveEdit" class="primary">Save Changes</button><button id="cancelEdit">Cancel</button>
+<button id="freehand" class="active">✏️ Freehand</button>
+<button id="followRoad">🛣️ Follow Road</button>
+<button id="addPoint">➕ Add Point</button>
+<button id="deletePoint">➖ Delete Last</button>
+<button id="saveEdit" class="active">Save Changes</button>
+<button id="cancelEdit">Cancel</button>
 </div>
-<div id="roadControls" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #ddd">
-<div style="font-size:12px;color:#666">Follow Road: tap the starting point/road, then tap the intersection where the boundary should turn. Preview the route, then add it.</div>
-<div id="roadName" style="font-weight:700;font-size:13px;margin-top:7px"></div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px">
-<button id="roadAdd" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#34c759;color:#fff">Add Road Segment</button>
-<button id="roadCancel" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#e5e5ea">Cancel Road</button>
+<div id="roadControls" class="roadControls">
+<div class="small">Tap the starting road, then tap the intersection where this boundary segment should end.</div>
+<div id="roadName" style="font-weight:700;font-size:13px;margin-top:5px">Ready.</div>
+<div class="roadBtns">
+<button id="roadAdd" class="primary">Add Road Segment</button>
+<button id="roadCancel">Cancel Road</button>
 </div>
 </div>
+</section>
+
+<section id="houseSheet">
+<div class="sheetTitle" id="houseTitle">Building</div>
+<div class="small">Status and notes are saved on this device.</div>
+<div class="statuses">
+<button data-status="worked" style="background:#dff5e4">🟢 Worked</button>
+<button data-status="nothome" style="background:#fff4c7">🟡 Not Home</button>
+<button data-status="return" style="background:#dceaff">🔵 Return</button>
+<button data-status="dnc" style="background:#eee">🚫 DNC</button>
 </div>
+<textarea id="houseNote" placeholder="Add a note..."></textarea>
+<button class="save" id="saveNote">Save</button>
+</section>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+(function(){
+'use strict';
 const map=L.map('map').setView([39.963,-79.878],14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap contributors'}).addTo(map);
 
-/*
- IMPORTANT:
- These initial polygons are only a starting reference from the uploaded paper card.
- They are NOT claimed to be final survey-grade coordinates.
- The app lets the user correct them and save the corrected geometry locally.
-*/
 const defaultTerritory=[[39.982,-79.910],[39.981,-79.890],[39.978,-79.870],[39.973,-79.851],[39.963,-79.840],[39.950,-79.846],[39.939,-79.857],[39.941,-79.875],[39.946,-79.892],[39.952,-79.905],[39.967,-79.910]];
 const defaultDNW=[
 [[39.9717,-79.8965],[39.9708,-79.8870],[39.9668,-79.8860],[39.9618,-79.8885],[39.9602,-79.8990],[39.9650,-79.9020]],
 [[39.9610,-79.8830],[39.9558,-79.8760],[39.9500,-79.8825],[39.9525,-79.8890],[39.9585,-79.8880]]
 ];
-let savedGeom=JSON.parse(localStorage.getItem('tt_geometry_v3')||'null');
-let territory= savedGeom?.territory || structuredClone(defaultTerritory);
-let dnw= savedGeom?.dnw || structuredClone(defaultDNW);
-
+let geometry=JSON.parse(localStorage.getItem('tt_geometry_stable')||'null')||{territory:defaultTerritory,dnw:defaultDNW};
+let territory=geometry.territory, dnw=geometry.dnw;
 const territoryLayer=L.polygon(territory,{color:'#d71920',weight:4,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
-const dnwLayers=dnw.map((p,i)=>L.polygon(p,{color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}).addTo(map).bindTooltip(i===0?'Do Not Work — Republic':'Do Not Work — Cardale'));
+const dnwLayers=dnw.map((p,i)=>L.polygon(p,{color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}).addTo(map).bindTooltip(i?'Do Not Work — Cardale':'Do Not Work — Republic'));
 
-let editMode=null, handles=[], addMode=false, originalGeom=null;
-let roadTool=false, roadStart=null, roadPreview=null, pendingRoad=null;
-let editorTarget='territory';
+let housesVisible=true, houseLayer=L.layerGroup().addTo(map);
+let records=JSON.parse(localStorage.getItem('tt_house_records_stable')||'{}');
+let houseCurrent=null;
+let editorTarget='territory', editMode=false, addMode=false, roadMode=false, handles=[], roadPreview=null, roadStart=null, pendingRoad=null, original=null;
 
-function banner(text){
- const b=document.getElementById('modeBanner');
- b.textContent=text;b.style.display=text?'block':'none';
-}
+const $=id=>document.getElementById(id);
+function banner(t){$('banner').textContent=t;$('banner').style.display=t?'block':'none'}
+function currentArray(){return editorTarget==='territory'?territory:dnw[Number(editorTarget.slice(3))]}
+function currentLayer(){return editorTarget==='territory'?territoryLayer:dnwLayers[Number(editorTarget.slice(3))]}
+
 function clearHandles(){handles.forEach(h=>map.removeLayer(h));handles=[]}
-function currentArray(){
- if(editorTarget==='territory') return territory;
- return dnw[editorTarget==='dnw0'?0:1];
-}
-function currentLayer(){
- if(editorTarget==='territory') return territoryLayer;
- return dnwLayers[editorTarget==='dnw0'?0:1];
-}
 function makeHandles(){
  clearHandles();
+ if(!editMode)return;
  const arr=currentArray();
- arr.forEach((pt,i)=>{
-   const h=L.marker(pt,{draggable:true}).addTo(map);
+ arr.forEach((p,i)=>{
+   const h=L.marker(p,{draggable:true}).addTo(map);
    h.on('drag',e=>{arr[i]=[e.latlng.lat,e.latlng.lng];currentLayer().setLatLngs(arr)});
    handles.push(h);
  });
 }
+function stopRoadMode(){
+ roadMode=false;roadStart=null;pendingRoad=null;
+ if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
+ $('roadControls').style.display='none';
+}
 function startEdit(target){
- if(roadTool) stopRoadTool();
- editorTarget=target; editMode=true; addMode=false; roadTool=false;
- originalGeom=JSON.parse(JSON.stringify({territory,dnw}));
- document.getElementById('editor').classList.add('show');
- document.getElementById('dnwChooser').style.display=(target==='territory'?'none':'block');
- document.getElementById('roadControls').style.display='none';
- document.getElementById('freehand').style.background='#007aff';
- document.getElementById('freehand').style.color='#fff';
- document.getElementById('followRoad').style.background='#e5e5ea';
- document.getElementById('followRoad').style.color='#111';
- document.getElementById('editorTitle').textContent=
-   target==='territory'?'Edit Territory':(target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale');
- document.getElementById('editorHelp').textContent='Drag a handle to fine-tune. Add Point inserts a point exactly where you tap on the map.';
- makeHandles();
- banner('EDITING '+document.getElementById('editorTitle').textContent.toUpperCase());
+ stopRoadMode(); clearHandles();
+ editorTarget=target; editMode=true; addMode=false;
+ original=JSON.parse(JSON.stringify({territory,dnw}));
+ $('editor').classList.add('show');
+ $('dnwChooser').style.display=target==='territory'?'none':'block';
+ $('editorTitle').textContent=target==='territory'?'Edit Territory':target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale';
+ $('editorHelp').textContent='Drag a handle to fine-tune. Use Add Point or Follow Road to build the boundary.';
+ $('freehand').classList.add('active'); $('followRoad').classList.remove('active');
+ makeHandles(); banner('EDITING '+$('editorTitle').textContent.toUpperCase());
 }
-function stopEdit(save){
- if(!save && originalGeom){
-   territory=originalGeom.territory;dnw=originalGeom.dnw;
-   territoryLayer.setLatLngs(territory);dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);
+function closeEditor(save){
+ if(!save&&original){
+  territory=original.territory;dnw=original.dnw;
+  territoryLayer.setLatLngs(territory);dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);
  }
- if(save) localStorage.setItem('tt_geometry_v3',JSON.stringify({territory,dnw}));
- clearHandles();editMode=null;addMode=false;editorTarget='territory';originalGeom=null;
- stopRoadTool();
- document.getElementById('editor').classList.remove('show');document.getElementById('dnwChooser').style.display='none';banner('');
+ if(save)localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+ stopRoadMode();clearHandles();editMode=false;addMode=false;original=null;
+ $('editor').classList.remove('show');$('dnwChooser').style.display='none';banner('');
 }
-function stopRoadTool(){
- roadTool=false;roadStart=null;pendingRoad=null;
- if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
- document.getElementById('roadControls').style.display='none';
-}
-document.getElementById('edit').onclick=()=>startEdit('territory');
-document.getElementById('dnwEdit').onclick=()=>{
- if(roadTool) stopRoadTool();
- document.getElementById('dnwChooser').style.display='block';
- startEdit(document.getElementById('dnwSelect').value);
-};
-document.getElementById('dnwSelect')?.addEventListener('change',e=>{if(editMode)startEdit(e.target.value)});
+$('editTerritory').addEventListener('click',()=>startEdit('territory'));
+$('editDNW').addEventListener('click',()=>startEdit($('dnwSelect').value));
+$('dnwSelect').addEventListener('change',()=>{if(editMode)startEdit($('dnwSelect').value)});
 
-document.getElementById('freehand').onclick=()=>{
- stopRoadTool(); addMode=false; makeHandles();
- document.getElementById('roadControls').style.display='none';
- document.getElementById('freehand').style.background='#007aff';
- document.getElementById('freehand').style.color='#fff';
- document.getElementById('followRoad').style.background='#e5e5ea';
- document.getElementById('followRoad').style.color='#111';
- document.getElementById('editorHelp').textContent='Drag a handle to fine-tune. Add Point inserts a point exactly where you tap on the map.';
+$('freehand').addEventListener('click',()=>{
+ if(!editMode)return;
+ stopRoadMode();addMode=false;makeHandles();
+ $('freehand').classList.add('active');$('followRoad').classList.remove('active');
+ $('editorHelp').textContent='Drag a handle to fine-tune. Use Add Point to tap exactly where a new corner should be.';
  banner('FREEHAND EDITING');
-};
-document.getElementById('followRoad').onclick=()=>{
- addMode=false; roadTool=true; roadStart=null; pendingRoad=null;
- if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
- document.getElementById('roadControls').style.display='block';
- document.getElementById('freehand').style.background='#e5e5ea';
- document.getElementById('freehand').style.color='#111';
- document.getElementById('followRoad').style.background='#007aff';
- document.getElementById('followRoad').style.color='#fff';
- document.getElementById('roadName').textContent='Tap the starting road or boundary corner.';
- banner('FOLLOW ROAD: TAP START');
-};
-document.getElementById('addPoint').onclick=()=>{
- stopRoadTool(); addMode=true; makeHandles();
- document.getElementById('editorHelp').textContent='ADD POINT MODE: tap anywhere on the map. The new point will be inserted into the nearest boundary segment at the exact location you tap.';
- banner('ADD POINT: TAP THE MAP');
-};
-document.getElementById('deletePoint').onclick=()=>{
- const arr=currentArray();
- if(arr.length<=3)return;
- arr.pop(); currentLayer().setLatLngs(arr); makeHandles();
-};
-document.getElementById('saveEdit').onclick=()=>stopEdit(true);
-document.getElementById('cancelEdit').onclick=()=>stopEdit(false);
+});
+$('addPoint').addEventListener('click',()=>{
+ if(!editMode)return;
+ stopRoadMode();addMode=true;makeHandles();
+ banner('ADD POINT: TAP THE MAP WHERE YOU WANT IT');
+});
+$('deletePoint').addEventListener('click',()=>{
+ if(!editMode)return;
+ const arr=currentArray();if(arr.length<=3)return;
+ arr.pop();currentLayer().setLatLngs(arr);makeHandles();
+});
+$('saveEdit').addEventListener('click',()=>closeEditor(true));
+$('cancelEdit').addEventListener('click',()=>closeEditor(false));
 
-function nearestSegmentIndex(arr, p){
- let best=Infinity, idx=0;
+function nearestSegmentIndex(arr,p){
+ let best=Infinity,idx=0;
  for(let i=0;i<arr.length;i++){
-   const a=arr[i], b=arr[(i+1)%arr.length];
-   const dx=b[1]-a[1],dy=b[0]-a[0];
-   const denom=dx*dx+dy*dy;
-   let t=denom?((p[1]-a[1])*dx+(p[0]-a[0])*dy)/denom:0;
-   t=Math.max(0,Math.min(1,t));
-   const q=[a[0]+t*dy,a[1]+t*dx];
-   const d=(p[0]-q[0])**2+(p[1]-q[1])**2;
-   if(d<best){best=d;idx=i}
+  const a=arr[i],b=arr[(i+1)%arr.length],dx=b[1]-a[1],dy=b[0]-a[0],den=dx*dx+dy*dy;
+  let t=den?((p[1]-a[1])*dx+(p[0]-a[0])*dy)/den:0;t=Math.max(0,Math.min(1,t));
+  const q=[a[0]+t*dy,a[1]+t*dx],d=(p[0]-q[0])**2+(p[1]-q[1])**2;
+  if(d<best){best=d;idx=i}
  }
  return idx;
 }
-function insertAtClick(latlng){
- const arr=currentArray(), p=[latlng.lat,latlng.lng];
- const idx=nearestSegmentIndex(arr,p);
- arr.splice(idx+1,0,p);
- currentLayer().setLatLngs(arr);
- makeHandles();
- // Highlight the new point briefly.
- if(handles[idx+1]) handles[idx+1].openTooltip?.();
-}
 map.on('click',e=>{
- if(!editMode) return;
- if(addMode){insertAtClick(e.latlng);addMode=false;banner('POINT ADDED — drag it if needed');return}
- if(!roadTool) return;
- handleRoadClick(e.latlng);
+ if(!editMode)return;
+ if(addMode){
+  const arr=currentArray(),p=[e.latlng.lat,e.latlng.lng],idx=nearestSegmentIndex(arr,p);
+  arr.splice(idx+1,0,p);currentLayer().setLatLngs(arr);makeHandles();addMode=false;
+  banner('POINT ADDED — DRAG IT TO FINE-TUNE');
+  return;
+ }
+ if(roadMode)handleRoadClick(e.latlng);
 });
 
+$('followRoad').addEventListener('click',()=>{
+ if(!editMode)return;
+ addMode=false;roadMode=true;roadStart=null;pendingRoad=null;
+ if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
+ $('roadControls').style.display='block';
+ $('followRoad').classList.add('active');$('freehand').classList.remove('active');
+ $('roadName').textContent='Tap the starting road or boundary corner.';
+ banner('FOLLOW ROAD: TAP START');
+});
+$('roadCancel').addEventListener('click',()=>{stopRoadMode();banner('EDITING '+$('editorTitle').textContent.toUpperCase())});
+
 async function snapPoint(lat,lng){
- const u=`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}.json?number=1`;
- const r=await fetch(u);if(!r.ok)throw new Error();
- const j=await r.json();if(j.code!=='Ok'||!j.waypoints?.length)throw new Error();
- const w=j.waypoints[0];return {lat:w.location[1],lng:w.location[0]};
+ const r=await fetch(`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}.json?number=1`);
+ if(!r.ok)throw Error();const j=await r.json();if(j.code!=='Ok'||!j.waypoints?.length)throw Error();
+ return {lat:j.waypoints[0].location[1],lng:j.waypoints[0].location[0]};
 }
 async function routeSegment(a,b){
- const u=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson&steps=true`;
- const r=await fetch(u);if(!r.ok)throw new Error();
- const j=await r.json();if(j.code!=='Ok'||!j.routes?.length)throw new Error();
- return j.routes[0];
+ const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson`);
+ if(!r.ok)throw Error();const j=await r.json();if(j.code!=='Ok'||!j.routes?.length)throw Error();return j.routes[0];
 }
 async function roadLabel(lat,lng){
- try{
-  const u=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`;
-  const r=await fetch(u);if(!r.ok)return '';
-  const j=await r.json();return j.address?.road||'';
- }catch(e){return ''}
+ try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`);const j=await r.json();return j.address?.road||''}catch(e){return ''}
 }
-async function handleRoadClick(latlng){
+async function handleRoadClick(ll){
  try{
-  const p=await snapPoint(latlng.lat,latlng.lng);
+  const p=await snapPoint(ll.lat,ll.lng);
   if(!roadStart){
-    roadStart=p;
-    const name=await roadLabel(p.lat,p.lng);
-    document.getElementById('roadName').textContent=name?`Starting road: ${name}`:'Starting road selected';
-    banner('FOLLOW ROAD: TAP THE INTERSECTION / END');
-    return;
+   roadStart=p;const n=await roadLabel(p.lat,p.lng);$('roadName').textContent=n?`Starting road: ${n}`:'Starting road selected';banner('FOLLOW ROAD: TAP THE END / INTERSECTION');return;
   }
-  const end=p, route=await routeSegment(roadStart,end);
-  const coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
+  const route=await routeSegment(roadStart,p),coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
   if(roadPreview)map.removeLayer(roadPreview);
   roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.85,dashArray:'10 7'}).addTo(map);
-  pendingRoad={coords,start:roadStart,end};
-  const name=await roadLabel(roadStart.lat,roadStart.lng);
-  document.getElementById('roadName').textContent=(name?`Preview: ${name}`:'Road segment preview')+` • ${Math.round(route.distance)} m`;
+  pendingRoad={start:roadStart,end:p,coords};
+  const n=await roadLabel(roadStart.lat,roadStart.lng);$('roadName').textContent=n?`Preview: ${n} • ${Math.round(route.distance)} m`:`Road preview • ${Math.round(route.distance)} m`;
   banner('ROAD PREVIEW — TAP ADD ROAD SEGMENT');
- }catch(e){
-  document.getElementById('roadName').textContent='Could not find a road there. Tap directly on a road.';
- }
+ }catch(e){$('roadName').textContent='Could not find a road there. Tap directly on a road.'}
 }
-document.getElementById('roadAdd').onclick=()=>{
+$('roadAdd').addEventListener('click',()=>{
  if(!pendingRoad)return;
- const arr=currentArray(), coords=pendingRoad.coords;
- // Insert the route immediately after the nearest boundary vertex to the start.
- let vi=0,best=Infinity;
- arr.forEach((p,i)=>{const d=(p[0]-pendingRoad.start.lat)**2+(p[1]-pendingRoad.start.lng)**2;if(d<best){best=d;vi=i}});
- // If the snapped start is not already close to a boundary vertex, add it first.
- if(Math.sqrt(best)>0.0005){arr.splice(vi+1,0,[pendingRoad.start.lat,pendingRoad.start.lng]);vi=vi+1}
- // Insert the route excluding its first point so the boundary follows the road.
- arr.splice(vi+1,0,...coords.slice(1));
+ const arr=currentArray(),c=pendingRoad.coords;
+ let vi=0,best=Infinity;arr.forEach((p,i)=>{const d=(p[0]-pendingRoad.start.lat)**2+(p[1]-pendingRoad.start.lng)**2;if(d<best){best=d;vi=i}});
+ arr.splice(vi+1,0,...c);
  currentLayer().setLatLngs(arr);makeHandles();
  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
- pendingRoad=null;roadStart=null;
- document.getElementById('roadName').textContent='Segment added. Tap the next road/intersection.';
+ roadStart=null;pendingRoad=null;$('roadName').textContent='Segment added. Tap the next road start.';
  banner('FOLLOW ROAD: TAP NEXT START');
-};
-document.getElementById('roadCancel').onclick=()=>{
- stopRoadTool();banner('EDITING '+document.getElementById('editorTitle').textContent.toUpperCase());
-};
-document.getElementById('locate').onclick=()=>map.locate({setView:true,maxZoom:18,enableHighAccuracy:true});
+});
+
+function buildingStyle(status){
+ return {color:'#666',weight:1,fillColor:status==='worked'?'#34c759':status==='nothome'?'#ffcc00':status==='return'?'#007aff':status==='dnc'?'#8e8e93':'#c7c7cc',fillOpacity:status?.62:.16};
+}
+async function loadHouses(){
+ if(!housesVisible){houseLayer.clearLayers();return}
+ const b=map.getBounds(),g=encodeURIComponent(JSON.stringify({xmin:b.getWest()-.003,ymin:b.getSouth()-.003,xmax:b.getEast()+.003,ymax:b.getNorth()+.003,spatialReference:{wkid:4326}}));
+ const url=`https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/MSBFP2/FeatureServer/0/query?f=geojson&where=1%3D1&returnGeometry=true&outFields=OBJECTID&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&geometry=${g}&outSR=4326&resultRecordCount=2000`;
+ try{
+  const r=await fetch(url);if(!r.ok)throw Error();const gj=await r.json();houseLayer.clearLayers();
+  L.geoJSON(gj,{style:f=>buildingStyle(records[f.properties.OBJECTID]?.status),onEachFeature:(f,l)=>l.on('click',()=>openHouse(String(f.properties.OBJECTID)))}).addTo(houseLayer);
+ }catch(e){console.warn('Building layer unavailable',e)}
+}
+function openHouse(id){
+ houseCurrent=id;$('houseTitle').textContent='Building';$('houseNote').value=records[id]?.note||'';$('houseSheet').classList.add('show');
+}
+document.querySelectorAll('[data-status]').forEach(b=>b.addEventListener('click',()=>{
+ if(!houseCurrent)return;records[houseCurrent]={...(records[houseCurrent]||{}),status:b.dataset.status};localStorage.setItem('tt_house_records_stable',JSON.stringify(records));$('houseSheet').classList.remove('show');loadHouses();
+}));
+$('saveNote').addEventListener('click',()=>{
+ if(!houseCurrent)return;records[houseCurrent]={...(records[houseCurrent]||{}),note:$('houseNote').value};localStorage.setItem('tt_house_records_stable',JSON.stringify(records));$('houseSheet').classList.remove('show');
+});
+$('houses').addEventListener('click',()=>{
+ housesVisible=!housesVisible;$('houses').textContent=housesVisible?'🏠 Houses ON':'🏠 Houses OFF';$('houses').classList.toggle('blue',housesVisible);loadHouses();
+});
+$('remaining').addEventListener('click',()=>{
+ if(!housesVisible){housesVisible=true;$('houses').textContent='🏠 Houses ON';$('houses').classList.add('blue');}
+ loadHouses();
+});
+$('locate').addEventListener('click',()=>map.locate({setView:true,maxZoom:18,enableHighAccuracy:true}));
 map.on('locationfound',e=>L.circleMarker(e.latlng,{radius:8,color:'#fff',weight:3,fillColor:'#007aff',fillOpacity:1}).addTo(map).bindPopup('You are here').openPopup());
 
-let cardOverlay=null, cardCorners=null, calibrating=false;
-const defaultCardBounds=[[39.946,-79.907],[39.982,-79.842]];
-function showCard(){
- if(cardOverlay){map.removeLayer(cardOverlay);cardOverlay=null;if(cardCorners)cardCorners.forEach(x=>map.removeLayer(x));cardCorners=null;calibrating=false;return}
- cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',defaultCardBounds,{opacity:.42,interactive:false}).addTo(map);
- cardCorners=defaultCardBounds.flatMap(pt=>[]);
- banner('TERRITORY CARD ON — use it as a visual reference');
-}
-document.getElementById('card').onclick=showCard;
+let cardOverlay=null;
+$('card').addEventListener('click',()=>{
+ if(cardOverlay){map.removeLayer(cardOverlay);cardOverlay=null;banner('');return}
+ cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',[[39.946,-79.907],[39.982,-79.842]],{opacity:.42}).addTo(map);
+ banner('TERRITORY CARD ON — visual reference only');
+});
+
+map.on('moveend',()=>{if(housesVisible&&!editMode)loadHouses()});
+loadHouses();
+})();
 </script>
-</body></html>
+</body>
+</html>
