@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#007aff"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Territory Tracker">
+<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<title>Territory Tracker</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Arial;background:#f2f2f7;color:#111}
+.app{height:100vh;display:flex;flex-direction:column}.header{background:#fff;padding:45px 16px 10px;border-bottom:1px solid #ddd;z-index:5}
+.header h1{margin:0;text-align:center;font-size:20px}.header p{text-align:center;margin:3px 0;color:#666;font-size:12px}
+#map{flex:1;min-height:0}.bottom{background:#fff;padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -2px 12px #0002;z-index:10}
+.actions{display:flex;gap:7px;flex-wrap:wrap}.actions button{flex:1;min-width:30%;border:0;border-radius:10px;padding:10px;font-weight:700}.blue{background:#007aff;color:#fff}.gray{background:#e5e5ea}
+.legend{font-size:11px;color:#666;margin-top:7px}.legend span{display:inline-block;margin-right:10px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin-right:3px}.u{background:#8e8e93}.w{background:#34c759}.nh{background:#ffcc00}.rt{background:#007aff}.dn{background:#ffdf5a}
+#sheet{display:none;position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -5px 25px #0003;padding:18px;z-index:30}.show{display:block!important}
+.sheet h2{margin:0 0 4px;font-size:19px}.small{font-size:12px;color:#666}.statuses{display:flex;gap:5px;margin:12px 0}.statuses button{flex:1;border:0;border-radius:10px;padding:10px 3px;font-weight:700}.note{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding:9px;font:inherit}.save{width:100%;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#007aff;color:#fff;font-weight:700}
+</style></head>
+<body>
+<div class="app"><div class="header"><h1>Territory Tracker</h1><p>Republic / Cardale</p></div><div id="map"></div>
+<div class="bottom"><div class="actions"><button class="blue" id="locate">📍 My Location</button><button class="gray" id="all">Show All</button><button class="gray" id="remaining">Remaining</button><button class="gray" id="card">Territory Card</button></div>
+<div class="legend"><span><i class="sw u"></i>Unworked</span><span><i class="sw w"></i>Worked</span><span><i class="sw nh"></i>Not Home</span><span><i class="sw rt"></i>Return</span><span><i class="sw dn"></i>Do Not Work</span></div></div></div>
+<div id="sheet"><h2 id="house"></h2><div class="small">Status and notes are saved on this device.</div>
+<div class="statuses"><button style="background:#dff5e4" data-s="worked">🟢 Worked</button><button style="background:#fff4c7" data-s="nothome">🟡 Not Home</button><button style="background:#dceaff" data-s="return">🔵 Return</button><button style="background:#eee" data-s="dnc">🚫 Do Not Call</button></div>
+<textarea id="note" class="note" placeholder="Add a note..."></textarea><button class="save" id="save">Save</button></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map').setView([39.961,-79.875],14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap contributors'}).addTo(map);
+
+// Working boundary based on the uploaded card. It is still a prototype and should be verified.
+const territory=[[39.982,-79.910],[39.981,-79.890],[39.978,-79.870],[39.973,-79.851],[39.963,-79.840],[39.950,-79.846],[39.939,-79.857],[39.941,-79.875],[39.946,-79.892],[39.952,-79.905],[39.967,-79.910]];
+L.polygon(territory,{color:'#d71920',weight:4,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
+
+const dnw=[
+ // Republic area: intentionally placed from the card's road/creek landmarks; editable in the next calibration pass.
+ [[39.9717,-79.8965],[39.9708,-79.8870],[39.9668,-79.8860],[39.9618,-79.8885],[39.9602,-79.8990],[39.9650,-79.9020]],
+ // Cardale area: around the Paradise Lake Rd / Swifts Lane neighborhood shown on the card.
+ [[39.9610,-79.8830],[39.9558,-79.8760],[39.9500,-79.8825],[39.9525,-79.8890],[39.9585,-79.8880]]
+];
+dnw.forEach((p,i)=>L.polygon(p,{color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}).addTo(map).bindTooltip(i?'Do Not Work — Cardale':'Do Not Work — Republic'));
+
+let records=JSON.parse(localStorage.getItem('tt_records_v2')||'{}'), current=null, buildingLayer=L.layerGroup().addTo(map);
+function color(s){return s==='worked'?'#34c759':s==='nothome'?'#ffcc00':s==='return'?'#007aff':s==='dnc'?'#8e8e93':'#8e8e93'}
+function styleFor(s){return {color:'#555',weight:1,fillColor:color(s),fillOpacity:.58}}
+function openHouse(id,props,center){current={id,props,center};document.getElementById('house').textContent=props?.address||'Building';document.getElementById('note').value=(records[id]||{}).note||'';document.getElementById('sheet').classList.add('show')}
+document.getElementById('save').onclick=()=>{if(!current)return;records[current.id]={...(records[current.id]||{}),note:document.getElementById('note').value};localStorage.setItem('tt_records_v2',JSON.stringify(records));document.getElementById('sheet').classList.remove('show')}
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{if(!current)return;records[current.id]={...(records[current.id]||{}),status:b.dataset.s};localStorage.setItem('tt_records_v2',JSON.stringify(records));document.getElementById('sheet').classList.remove('show');loadBuildings()})
+
+async function loadBuildings(){
+ const b=map.getBounds(); const pad=.004;
+ const geom=encodeURIComponent(JSON.stringify({xmin:b.getWest()-pad,ymin:b.getSouth()-pad,xmax:b.getEast()+pad,ymax:b.getNorth()+pad,spatialReference:{wkid:4326}}));
+ const url='https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/MSBFP2/FeatureServer/0/query?f=geojson&where=1%3D1&returnGeometry=true&outFields=OBJECTID&geometryType=esriGeometryEnvelope&spatialRel=esriSpatialRelIntersects&geometry='+geom+'&outSR=4326&resultRecordCount=2000';
+ try{
+  const r=await fetch(url); if(!r.ok)throw new Error('Building service unavailable'); const gj=await r.json();
+  buildingLayer.clearLayers();
+  L.geoJSON(gj,{style:f=>styleFor(records[f.properties.OBJECTID]?.status),onEachFeature:(f,l)=>{
+    const c=l.getBounds().getCenter(); l.on('click',()=>openHouse(String(f.properties.OBJECTID),f.properties,c));
+  }}).addTo(buildingLayer);
+ }catch(e){console.warn(e)}
+}
+map.on('moveend',()=>loadBuildings()); loadBuildings();
+document.getElementById('locate').onclick=()=>map.locate({setView:true,maxZoom:18,enableHighAccuracy:true});
+map.on('locationfound',e=>L.circleMarker(e.latlng,{radius:8,color:'#fff',weight:3,fillColor:'#007aff',fillOpacity:1}).addTo(map).bindPopup('You are here').openPopup());
+document.getElementById('all').onclick=()=>buildingLayer.eachLayer(l=>l.setStyle({fillOpacity:.58}));
+document.getElementById('remaining').onclick=()=>buildingLayer.eachLayer(l=>{const id=String(l.feature.properties.OBJECTID);l.setStyle({fillOpacity:records[id]?.status ? 0.12 : 0.58})});
+let cardOverlay=null;
+document.getElementById('card').onclick=()=>{
+ if(cardOverlay){map.removeLayer(cardOverlay);cardOverlay=null;return}
+ // The uploaded card is included as a calibrated reference image. The yellow areas on the card are the source of truth.
+ const bounds=[[39.946,-79.907],[39.982,-79.842]];
+ cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',bounds,{opacity:.42,interactive:false}).addTo(map);
+ alert('Territory card overlay is on. Use it as the reference for the two yellow Do Not Work areas. We will use this to make the final polygons accurate.');
+}
+</script></body></html>
