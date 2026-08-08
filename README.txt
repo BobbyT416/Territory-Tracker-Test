@@ -1,11 +1,12 @@
-Territory Tracker Version 3 test build
+Territory Tracker Version 4 test build
 
-New:
-- Houses ON/OFF
-- Building footprints with status shading
-- Editable territory boundary
-- Editable Do Not Work area (first area; second area can be added to the same editor pattern)
-- Local saving of edited geometry and house notes/status
+New in v4:
+- Follow Road mode.
+- Tap a starting road and an ending/intersection point.
+- Points are snapped to the OpenStreetMap street network.
+- A routed road segment is previewed before adding it to the boundary.
+- Existing freehand editing remains available for fine adjustment.
+- Houses ON/OFF and building status shading remain.
 
-IMPORTANT:
-Initial territory and Do Not Work geometry are still reference approximations. Use Edit Territory/Edit Do Not Work to calibrate them against the paper card before field use.
+Important:
+The public OSRM routing service is used for this prototype. Routing between two points follows the road network, but it is not yet a true named-road selector. For the production version, the road-selection tool should use road vector data so the user can explicitly choose "Stone Church Rd", "Bunker Hill Rd", etc. and then terminate at an intersection.

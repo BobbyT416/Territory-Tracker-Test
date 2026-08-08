@@ -35,6 +35,7 @@
 <button id="locate">📍 My Location</button>
 <button id="card">🗺️ Territory Card</button>
 <button id="edit">✏️ Edit Territory</button>
+<button id="followRoad">🛣️ Follow Road</button>
 <button id="dnwEdit">🟨 Edit Do Not Work</button>
 <button id="remaining">Remaining</button>
 </div>
@@ -51,6 +52,20 @@
 </div>
 <textarea id="note" class="note" placeholder="Add a note..."></textarea>
 <button class="save" id="save">Save Note</button>
+</div>
+
+
+<div id="roadPanel" style="display:none;position:fixed;left:10px;right:10px;bottom:125px;background:#fff;border-radius:16px;box-shadow:0 3px 18px #0003;padding:14px;z-index:25">
+  <div style="font-weight:700;font-size:16px">🛣️ Follow Road</div>
+  <div id="roadHelp" style="font-size:12px;color:#666;margin-top:4px">
+    Tap the road where the boundary should begin. Then tap the intersection where you want to leave that road.
+    The app will snap the points to the road network and draw the boundary along the routed road.
+  </div>
+  <div id="roadName" style="font-size:13px;font-weight:700;margin-top:8px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px">
+    <button id="roadCancel" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#e5e5ea">Cancel</button>
+    <button id="roadAdd" style="border:0;border-radius:10px;padding:10px;font-weight:700;background:#007aff;color:#fff">Add Road Segment</button>
+  </div>
 </div>
 
 <div id="editor">
@@ -112,7 +127,7 @@ function startEdit(mode){
  makeHandles(arr);
  document.getElementById('editor').classList.add('show');
  document.getElementById('editorTitle').textContent=mode==='territory'?'Edit Territory':'Edit Do Not Work Area';
- document.getElementById('editorHelp').textContent='Drag the handles to match the paper card. Add Point lets you tap the map to insert a new corner. Save when finished.';
+ document.getElementById('editorHelp').textContent='Drag handles for fine adjustment, or use Follow Road to build long boundary sections along actual streets. Add Point inserts a new corner. Save when finished.';
  banner(mode==='territory'?'EDITING TERRITORY BOUNDARY':'EDITING DO NOT WORK AREA');
 }
 function stopEdit(save){
@@ -121,8 +136,8 @@ function stopEdit(save){
  clearHandles();editMode=null;addMode=false;originalGeom=null;
  document.getElementById('editor').classList.remove('show');banner('');
 }
-document.getElementById('edit').onclick=()=>startEdit('territory');
-document.getElementById('dnwEdit').onclick=()=>{startEdit('dnw0');};
+document.getElementById('edit').onclick=()=>{if(roadMode)stopRoadMode();startEdit('territory')};
+document.getElementById('dnwEdit').onclick=()=>{if(roadMode)stopRoadMode();startEdit('dnw0');};
 document.getElementById('addPoint').onclick=()=>{addMode=!addMode;banner(addMode?'ADD POINT: tap the map to add a corner':'EDITING '+(editMode==='territory'?'TERRITORY':'DO NOT WORK AREA'))};
 document.getElementById('deletePoint').onclick=()=>{
  const arr=editMode==='territory'?territory:dnw[Number(editMode.slice(3))];
@@ -185,6 +200,96 @@ document.getElementById('remaining').onclick=()=>{
  if(!housesVisible){housesVisible=true;document.getElementById('houses').textContent='🏠 Houses ON';loadBuildings();}
  setTimeout(()=>buildingLayer.eachLayer(l=>{const id=String(l.feature.properties.OBJECTID);l.setStyle({fillOpacity:records[id]?.status?0.08:0.60})}),500);
 };
+
+// Road-following boundary mode.
+// Uses the OSRM public routing service: clicks are snapped to the street network,
+// then the route geometry between the two clicks becomes the boundary segment.
+// This is a prototype; the final app can use a dedicated road-vector service
+// so the user can select the exact named road rather than relying on shortest-path routing.
+let roadMode=false, roadStart=null, roadPreview=null, roadSegments=[];
+const roadPanel=document.getElementById('roadPanel');
+const roadName=document.getElementById('roadName');
+
+function startRoadMode(){
+  roadMode=true; roadStart=null; roadSegments=[];
+  roadPanel.style.display='block';
+  banner('FOLLOW ROAD: tap the starting road');
+  roadName.textContent='';
+}
+function stopRoadMode(){
+  roadMode=false; roadStart=null;
+  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
+  roadPanel.style.display='none';
+  banner('');
+}
+document.getElementById('followRoad').onclick=()=>roadMode?stopRoadMode():startRoadMode();
+document.getElementById('roadCancel').onclick=stopRoadMode;
+
+async function snapPoint(lat,lng){
+  const u=`https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}.json?number=1`;
+  const r=await fetch(u); if(!r.ok) throw new Error('Could not snap to road');
+  const j=await r.json();
+  if(j.code!=='Ok'||!j.waypoints?.length) throw new Error('No nearby road found');
+  const w=j.waypoints[0];
+  return {lat:w.location[1],lng:w.location[0],distance:w.distance};
+}
+async function routeSegment(a,b){
+  const u=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}.json?overview=full&geometries=geojson&steps=true&alternatives=true`;
+  const r=await fetch(u); if(!r.ok) throw new Error('Could not route between points');
+  const j=await r.json();
+  if(j.code!=='Ok'||!j.routes?.length) throw new Error('No road route found');
+  return j.routes[0];
+}
+async function reverseRoadName(lat,lng){
+  try{
+    const u=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+    const r=await fetch(u,{headers:{'Accept':'application/json'}});
+    if(!r.ok)return '';
+    const j=await r.json();
+    return j.address?.road||'';
+  }catch(e){return ''}
+}
+map.on('click',async e=>{
+  if(!roadMode || editMode) return;
+  try{
+    const snapped=await snapPoint(e.latlng.lat,e.latlng.lng);
+    if(!roadStart){
+      roadStart=snapped;
+      L.circleMarker([snapped.lat,snapped.lng],{radius:7,color:'#007aff',fillColor:'#007aff',fillOpacity:1}).addTo(map);
+      const name=await reverseRoadName(snapped.lat,snapped.lng);
+      roadName.textContent=name?`Start road: ${name}`:'Start point snapped to road';
+      banner('FOLLOW ROAD: now tap the intersection / ending point');
+      return;
+    }
+    const end=snapped;
+    const route=await routeSegment(roadStart,end);
+    const coords=route.geometry.coordinates.map(x=>[x[1],x[0]]);
+    if(roadPreview)map.removeLayer(roadPreview);
+    roadPreview=L.polyline(coords,{color:'#007aff',weight:7,opacity:.8,dashArray:'10 7'}).addTo(map);
+    const name=await reverseRoadName(roadStart.lat,roadStart.lng);
+    roadName.textContent=(name?`Road segment: ${name}`:'Road segment found')+` • ${Math.round(route.distance)} m`;
+    window._pendingRoad={coords,route,name};
+    banner('ROAD PREVIEW: tap “Add Road Segment” to add it to the boundary');
+  }catch(err){
+    roadName.textContent='I could not find a road at that location. Try tapping closer to the road.';
+  }
+});
+document.getElementById('roadAdd').onclick=()=>{
+  if(!window._pendingRoad)return;
+  const coords=window._pendingRoad.coords;
+  // Add the routed geometry to the territory polygon in sequence.
+  // The first segment starts from the current territory end; subsequent segments append.
+  if(!territory.length) territory=coords.slice();
+  else territory.push(...coords);
+  territoryLayer.setLatLngs(territory);
+  if(roadPreview){map.removeLayer(roadPreview);roadPreview=null}
+  roadSegments.push(window._pendingRoad);
+  window._pendingRoad=null;
+  roadStart=null;
+  roadName.textContent='Road segment added. Tap the next road segment start.';
+  banner('FOLLOW ROAD: tap the next road segment');
+};
+
 document.getElementById('locate').onclick=()=>map.locate({setView:true,maxZoom:18,enableHighAccuracy:true});
 map.on('locationfound',e=>L.circleMarker(e.latlng,{radius:8,color:'#fff',weight:3,fillColor:'#007aff',fillOpacity:1}).addTo(map).bindPopup('You are here').openPopup());
 
