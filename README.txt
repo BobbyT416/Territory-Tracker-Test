@@ -1,13 +1,10 @@
-Version 21 — clean Do Not Work labels and Houses action button.
+Version 22 — cleanup/migration for duplicate Do Not Work areas.
 
-Do Not Work:
-- The map has exactly ONE visible label per area.
-- The old polygon tooltip is removed completely.
-- The label is the saved Area Name and is centered in the polygon.
-- The dropdown is only for selecting an area; Area name is the only naming field.
-- Renaming updates the single centered label.
-
-Houses:
-- Houses visible -> button says Houses OFF.
-- Houses hidden -> button says Houses ON.
-- Button text tells the action that will happen when pressed.
+Important:
+- On startup, duplicate/overlapping Do Not Work polygons left by older versions are automatically consolidated.
+- A user-named area is preferred over a generic "Do Not Work Area N".
+- Only one permanent center label is created for each remaining area.
+- Center label uses the polygon centroid rather than a simple vertex average.
+- Removed obsolete editor code that hard-coded Republic/Cardale.
+- Cancel/Save rebuilds DNW layers and labels cleanly.
+- Houses button remains an action button: visible -> Houses OFF; hidden -> Houses ON.

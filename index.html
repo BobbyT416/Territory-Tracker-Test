@@ -70,7 +70,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <div class="sheetTitle" id="editorTitle">Edit Territory</div>
 <div class="small" id="editorHelp">EDITING ORDER: 1) Add Point at each intersection. 2) Follow Road. 3) Tap two blue points in order. 4) Review the blue road preview. 5) Tap Add Road Segment.</div>
 <div id="dnwChooser" style="display:none;margin-top:8px">
-<div class="small" style="margin-bottom:6px">Select an existing area to edit.</div><label class="small" for="dnwSelect">Select Do Not Work area</label>
+<div class="small" style="margin-bottom:6px">Choose which Do Not Work area you want to edit.</div><label class="small" for="dnwSelect">Area to edit</label>
 <select id="dnwSelect" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px"></select><label class="small" for="dnwName" style="display:block;margin-top:7px">Area name</label>
 <input id="dnwName" type="text" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:9px" placeholder="e.g. Republic">
 <button id="saveDNWName" style="margin-top:7px">Save Area Name</button>
@@ -128,8 +128,54 @@ const defaultDNW=[
 let geometry=JSON.parse(localStorage.getItem('tt_geometry_stable')||'null')||{territory:defaultTerritory,dnw:defaultDNW};
 let territory=geometry.territory, dnw=geometry.dnw;
 let dnwNames=JSON.parse(localStorage.getItem('tt_dnw_names_v1')||'null');
-if(!Array.isArray(dnwNames)) dnwNames=dnw.map((_,i)=>i===0?'Do Not Work Area 1':i===1?'Do Not Work Area 2':`Do Not Work Area ${i+1}`);
+if(!Array.isArray(dnwNames)) dnwNames=[];
 while(dnwNames.length<dnw.length) dnwNames.push(`Do Not Work Area ${dnwNames.length+1}`);
+if(dnwNames.length>dnw.length) dnwNames=dnwNames.slice(0,dnw.length);
+
+// Clean up duplicate Do Not Work polygons left by earlier versions.
+// Two polygons are considered duplicates when their centers and areas are nearly identical.
+// Prefer a user-supplied name over the generic "Do Not Work Area N" name.
+function polygonStats(points){
+  if(!points || points.length<3) return null;
+  let area=0,cx=0,cy=0;
+  for(let i=0;i<points.length;i++){
+    const a=points[i],b=points[(i+1)%points.length];
+    const cross=a[1]*b[0]-b[1]*a[0];
+    area+=cross; cx+=(a[1]+b[1])*cross; cy+=(a[0]+b[0])*cross;
+  }
+  area=Math.abs(area)/2;
+  if(Math.abs(area)<1e-12){
+    return {lat:points.reduce((s,p)=>s+p[0],0)/points.length,lng:points.reduce((s,p)=>s+p[1],0)/points.length,area};
+  }
+  return {lat:cy/(6*(area*(area<0?-1:1))),lng:cx/(6*(area*(area<0?-1:1))),area};
+}
+function genericDNWName(n){
+  return !n || /^Do Not Work Area \d+$/i.test(n.trim());
+}
+function cleanDuplicateDNW(){
+  const keep=[], names=[];
+  for(let i=0;i<dnw.length;i++){
+    const s=polygonStats(dnw[i]);
+    if(!s){continue}
+    let duplicate=-1;
+    for(let j=0;j<keep.length;j++){
+      const t=polygonStats(keep[j]);
+      if(!t)continue;
+      const dist=Math.hypot((s.lat-t.lat)*111320,(s.lng-t.lng)*111320*Math.cos(s.lat*Math.PI/180));
+      const ratio=Math.max(s.area,t.area)/Math.max(1e-12,Math.min(s.area,t.area));
+      if(dist<35 && ratio<1.25){duplicate=j;break}
+    }
+    if(duplicate<0){
+      keep.push(dnw[i]); names.push(dnwNames[i]||`Do Not Work Area ${i+1}`);
+    }else if(genericDNWName(names[duplicate]) && !genericDNWName(dnwNames[i])){
+      keep[duplicate]=dnw[i]; names[duplicate]=dnwNames[i];
+    }
+  }
+  dnw=keep; dnwNames=names;
+  localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+  localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
+}
+cleanDuplicateDNW();
 const territoryLayer=L.polygon(territory,{color:'transparent',weight:0,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
 let territoryOutline=L.polyline([], {color:'#d71920',weight:3,opacity:.9,interactive:false}).addTo(map);
 
@@ -196,10 +242,18 @@ function currentLayer(){
 
 
 function polygonCenter(points){
-  if(!points || !points.length) return null;
-  let lat=0,lng=0;
-  points.forEach(p=>{lat+=p[0];lng+=p[1]});
-  return [lat/points.length,lng/points.length];
+  if(!points || points.length<3)return null;
+  let a=0,cx=0,cy=0;
+  for(let i=0;i<points.length;i++){
+    const p=points[i],q=points[(i+1)%points.length];
+    const cross=p[1]*q[0]-q[1]*p[0];
+    a+=cross; cx+=(p[1]+q[1])*cross; cy+=(p[0]+q[0])*cross;
+  }
+  if(Math.abs(a)<1e-12){
+    return [points.reduce((s,p)=>s+p[0],0)/points.length,
+            points.reduce((s,p)=>s+p[1],0)/points.length];
+  }
+  return [cy/(3*a),cx/(3*a)];
 }
 function refreshDNWLabel(idx){
   if(dnwLabelLayers[idx]) {
@@ -320,36 +374,49 @@ function stopRoadMode(){
  $('roadControls').style.display='none';
  handles.forEach(h=>h.setOpacity(1));
 }
-function startEdit(target){
- stopRoadMode(); clearHandles();
- editorTarget=target; editMode=true; addMode=false; window.selectedFreehandIndex=null;
- original=JSON.parse(JSON.stringify({territory,dnw}));
- $('editor').classList.add('show');
- $('dnwChooser').style.display=target==='territory'?'none':'block';
- $('editorTitle').textContent=target==='territory'?'Edit Territory':target==='dnw0'?'Edit Do Not Work — Republic':'Edit Do Not Work — Cardale';
- if(target!=='territory'){
-   dnwLayers.forEach((layer,i)=>layer.setStyle({fillOpacity:i===Number(target.slice(3))?.62:.18,weight:i===Number(target.slice(3))?3:1}));
- }
- $('editorHelp').textContent='You are editing one area at a time. The selected Do Not Work area has bright blue edit points; other areas are not modified.';
- $('freehand').classList.add('active'); $('followRoad').classList.remove('active');
- makeHandles(); banner('EDITING '+$('editorTitle').textContent.toUpperCase());
-}
 function closeEditor(save){
- if(!save&&original){
-  territory=original.territory;dnw=original.dnw;
-  refreshTerritoryDisplay();dnwLayers[0].setLatLngs(dnw[0]);dnwLayers[1].setLatLngs(dnw[1]);
- }
- if(save){localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw})); localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));}
- stopRoadMode();
- if(!save && addingDNW && activeDNWIndex!==null && dnw[activeDNWIndex]?.length===0){
-   map.removeLayer(dnwLayers[activeDNWIndex]); dnw.splice(activeDNWIndex,1); dnwLayers.splice(activeDNWIndex,1);
- }
- clearHandles();editMode=false;addMode=false;addingDNW=false;activeDNWIndex=null;original=null;
- $('editor').classList.remove('show');$('dnwChooser').style.display='none';
- dnwLayers.forEach(layer=>layer.setStyle({color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48}));
- banner('');
+  if(!save && original){
+    territory=original.territory;
+    dnw=original.dnw;
+    dnwNames=original.dnwNames||dnwNames;
+    refreshTerritoryDisplay();
+    dnwLayers.forEach(layer=>{if(layer)map.removeLayer(layer)});
+    dnwLabelLayers.forEach(layer=>{if(layer)map.removeLayer(layer)});
+    dnwLayers.length=0;
+    dnwLabelLayers.length=0;
+    dnw.forEach((_,i)=>ensureDNWLayer(i));
+    refreshAllDNWLabels();
+    localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+    localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
+  }else if(save){
+    localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+    localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
+  }
+  stopRoadMode();
+  clearHandles();
+  editMode=false; addMode=false; addingDNW=false; activeDNWIndex=null; original=null;
+  $('editor').classList.remove('show');
+  $('dnwChooser').style.display='none';
+  dnwLayers.forEach(layer=>{
+    if(layer)layer.setStyle({color:'#b8860b',weight:2,fillColor:'#ffd54f',fillOpacity:.48});
+  });
+  banner('');
 }
-$('editTerritory').addEventListener('click',()=>startEdit('territory'));
+$('saveEdit').addEventListener('click',()=>closeEditor(true));
+$('cancelEdit').addEventListener('click',()=>closeEditor(false));
+
+$('editTerritory').addEventListener('click',()=>{
+  stopRoadMode(); clearHandles();
+  editorTarget='territory'; editMode=true; addMode=false; addingDNW=false; activeDNWIndex=null;
+  original=JSON.parse(JSON.stringify({territory,dnw,dnwNames}));
+  $('editor').classList.add('show');
+  $('dnwChooser').style.display='none';
+  $('editorTitle').textContent='Edit Territory';
+  $('editorHelp').textContent='Edit the red territory boundary. Drag points, add points, or use Follow Road.';
+  $('freehand').classList.add('active'); $('followRoad').classList.remove('active');
+  makeHandles();
+  banner('EDITING TERRITORY');
+});
 function setActiveDNW(idx){
   if(idx<0 || idx>=dnw.length)return;
   activeDNWIndex=idx;
@@ -715,8 +782,8 @@ $('saveNote').addEventListener('click',()=>{
  if(!houseCurrent)return;records[houseCurrent]={...(records[houseCurrent]||{}),note:$('houseNote').value};localStorage.setItem('tt_house_records_stable',JSON.stringify(records));$('houseSheet').classList.remove('show');
 });
 function updateHouseButton(){
-  $('houses').textContent = housesVisible ? '🏠 Houses OFF' : '🏠 Houses ON';
-  $('houses').classList.toggle('blue', housesVisible);
+  $('houses').textContent=housesVisible?'🏠 Houses OFF':'🏠 Houses ON';
+  $('houses').classList.toggle('blue',housesVisible);
 }
 $('houses').addEventListener('click',()=>{
  housesVisible=!housesVisible;
