@@ -176,6 +176,29 @@ function cleanDuplicateDNW(){
   localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
 }
 cleanDuplicateDNW();
+
+// Recovery migration: if the saved map has lost the original Cardale area,
+// restore only the missing built-in second area. Existing custom areas are untouched.
+(function restoreMissingCardale(){
+  const cardaleDefault=defaultDNW[1];
+  if(!Array.isArray(cardaleDefault)) return;
+  const near=(a,b)=>{
+    if(!a||!b||!a.length||!b.length)return false;
+    const sa=polygonStats(a), sb=polygonStats(b);
+    if(!sa||!sb)return false;
+    const d=Math.hypot((sa.lat-sb.lat)*111320,(sa.lng-sb.lng)*111320*Math.cos(sa.lat*Math.PI/180));
+    const ratio=Math.max(sa.area,sb.area)/Math.max(1e-12,Math.min(sa.area,sb.area));
+    return d<80 && ratio<1.5;
+  };
+  const exists=dnw.some(p=>near(p,cardaleDefault));
+  if(!exists){
+    dnw.push(cardaleDefault.map(p=>[p[0],p[1]]));
+    dnwNames.push('Do Not Work - Cardale');
+    localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
+    localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
+  }
+})();
+
 const territoryLayer=L.polygon(territory,{color:'transparent',weight:0,fillColor:'#d71920',fillOpacity:.05}).addTo(map);
 let territoryOutline=L.polyline([], {color:'#d71920',weight:3,opacity:.9,interactive:false}).addTo(map);
 
@@ -276,9 +299,7 @@ function refreshDNWLabel(idx){
       iconAnchor:[0,0]
     })
   }).addTo(map);
-  if(cardMode && dnwLabelLayers[idx] && map.hasLayer(dnwLabelLayers[idx])){
-    map.removeLayer(dnwLabelLayers[idx]);
-  }
+  if(cardMode && dnwLabelLayers[idx]) map.removeLayer(dnwLabelLayers[idx]);
 }
 function refreshAllDNWLabels(){
   dnw.forEach((_,i)=>refreshDNWLabel(i));
@@ -830,8 +851,9 @@ let cardMode=false;
 let savedMapView=null;
 const cardBounds=[[39.946,-79.907],[39.982,-79.842]];
 
-function setDNWLabelsVisible(visible){
-  if(!Array.isArray(dnwLabelLayers)) return;
+
+function setCardDNWLabelsVisible(visible){
+  if(typeof dnwLabelLayers==='undefined') return;
   dnwLabelLayers.forEach(layer=>{
     if(!layer) return;
     if(visible){
@@ -846,7 +868,7 @@ function enterCardMode(){
   if(cardMode)return;
   cardMode=true;
   savedMapView={center:map.getCenter(),zoom:map.getZoom()};
-  setDNWLabelsVisible(false);
+  setCardDNWLabelsVisible(false);
   // Show the original territory card as an opaque card, not as a faded overlay.
   cardOverlay=L.imageOverlay('TerritoryTracker_card_rectified.jpg',cardBounds,{
     opacity:1,
@@ -866,7 +888,7 @@ function enterLiveMapMode(){
     map.removeLayer(cardOverlay);
     cardOverlay=null;
   }
-  setDNWLabelsVisible(true);
+  setCardDNWLabelsVisible(true);
   $('card').textContent='🗺️ Territory Card';
   banner('');
   if(savedMapView){

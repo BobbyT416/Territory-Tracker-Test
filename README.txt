@@ -1,8 +1,7 @@
-Version 26 — based directly on Version 24.
+Version 27 — recovery build based directly on Version 24.
 
-Only change from Version 24:
-- Hide live-map Do Not Work center labels while Territory Card is displayed.
-- Restore the labels when returning to Live Map.
-
-No Do Not Work geometry, names, cleanup logic, or localStorage data handling was changed.
-This is intentionally based on Version 24 because Version 24 had the working Territory Card and the user's existing Do Not Work data.
+- Keeps Version 24's working controls and Territory Card behavior.
+- Hides only live-map Do Not Work labels while the Territory Card is displayed.
+- Restores the original built-in Cardale Do Not Work area ONLY if it is missing from saved data.
+- Does not overwrite existing custom territory or Do Not Work geometry.
+- Cardale recovery is named "Do Not Work - Cardale".
