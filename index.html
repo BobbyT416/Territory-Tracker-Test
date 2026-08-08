@@ -57,6 +57,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
 <button id="editDNW">🟨 Edit Do Not Work</button>
 <button id="addDNW">➕ Add Do Not Work Area</button>
 <button id="remaining" title="Show only houses not marked Worked">Remaining</button>
+<button id="exportData" type="button">💾 Export Map Data</button>
 </div>
 <div class="legend">
 <span><i class="sw" style="background:#c7c7cc"></i>Unworked</span>
@@ -225,6 +226,25 @@ let handles=[], selectedPointIndices=[], roadPreview=null, pendingRoad=null, ori
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
 const $=id=>document.getElementById(id);
+
+function exportMapData(){
+  const payload={
+    version:1,
+    territory:territory,
+    dnw:dnw,
+    dnwNames:dnwNames,
+    exportedAt:new Date().toISOString()
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='territory-tracker-map-data.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+$('exportData').addEventListener('click',exportMapData);
 function banner(t){$('banner').textContent=t;$('banner').style.display=t?'block':'none'}
 function currentDNWIndex(){
   if(activeDNWIndex!==null)return activeDNWIndex;
