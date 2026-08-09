@@ -1,13 +1,15 @@
-Territory Tracker Sync Test v32
+Territory Tracker Sync Test v33
 
-Based on working iPhone v31.
+Based on working Sync Test v32.
 
-Adds a separate Cloud Sync panel using Supabase:
-- User enters Project URL + Publishable key once.
-- User signs in with a Supabase Auth email/password.
-- Save to Cloud stores territory + Do Not Work geometry/names in public.territory_data.
-- Load from Cloud restores those map elements.
-- Existing local map data, houses, Remaining, editing, Follow Road, and Territory Card remain unchanged.
-- Publishable key is client-safe; never use a Supabase secret/service-role key in this app.
+Changes:
+- Cloud Save now includes house statuses and notes (house_records).
+- Cloud Load restores house statuses and notes.
+- Export Map Data also includes house_records.
+- Existing Supabase session is restored automatically; login fields are hidden when already signed in.
+- Sign-in session remains persistent on the device using Supabase Auth.
+- Existing territory, Do Not Work, houses, Remaining, editing, Follow Road, and Territory Card logic is unchanged.
 
-Supabase JS is loaded from the official CDN-supported package path.
+Database prerequisite:
+Run:
+ALTER TABLE public.territory_data ADD COLUMN IF NOT EXISTS house_records jsonb NOT NULL DEFAULT '{}'::jsonb;

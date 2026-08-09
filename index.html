@@ -72,6 +72,9 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
   }
 }
 
+
+#syncSignedInBadge{font-weight:600}
+@media(max-width:600px){#syncSheet input{font-size:16px!important;min-height:44px}}
 </style>
 
 <style id="iphone-layout-v28">
@@ -187,6 +190,8 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
   </div>
 
   <div id="syncAuth" style="display:none">
+    <div id="syncSignedInBadge" class="small" style="display:none;margin:8px 0">✓ Signed in</div>
+    <div id="syncLoginFields">
     <label class="small">Sync account email</label>
     <input id="syncEmail" type="email" autocomplete="email">
     <label class="small">Password</label>
@@ -194,6 +199,7 @@ textarea{width:100%;height:70px;border:1px solid #ccc;border-radius:10px;padding
     <div style="display:flex;gap:7px;margin-top:7px">
       <button class="save" id="syncSignIn" style="flex:1">Sign In</button>
       <button class="save" id="syncSignOut" style="flex:1;background:#e5e5ea;color:#111">Sign Out</button>
+    </div>
     </div>
   </div>
 
@@ -447,16 +453,19 @@ async function syncConnect(){
 }
 async function syncRefreshSession(){
   if(!syncClient)return;
-  const {data,error}=await syncClient.auth.getUser();
-  if(error || !data?.user){
-    syncUser=null;
-    $('syncActions').style.display='none';
-    $('syncStatus').textContent='Connected. Please sign in.';
-    return;
+  const {data:{session}}=await syncClient.auth.getSession();
+  syncUser=session?.user||null;
+  $('syncActions').style.display=syncUser?'block':'none';
+  if(syncUser){
+    $('syncSignedInBadge').style.display='block';
+    $('syncSignedInBadge').textContent='✓ Signed in as '+syncUser.email;
+    $('syncLoginFields').style.display='none';
+    syncSetStatus('Connected and signed in.',true);
+  }else{
+    $('syncSignedInBadge').style.display='none';
+    $('syncLoginFields').style.display='block';
+    syncSetStatus('Connected. Please sign in.');
   }
-  syncUser=data.user;
-  $('syncActions').style.display='block';
-  $('syncStatus').textContent='Signed in as '+syncUser.email;
 }
 async function syncSignIn(){
   if(!syncClient){syncSetStatus('Connect to Supabase first.');return}
@@ -468,12 +477,17 @@ async function syncSignIn(){
   syncUser=data.user;
   $('syncPassword').value='';
   $('syncActions').style.display='block';
-  syncSetStatus('Signed in as '+syncUser.email,true);
+  $('syncSignedInBadge').style.display='block';
+  $('syncSignedInBadge').textContent='✓ Signed in as '+syncUser.email;
+  $('syncLoginFields').style.display='none';
+  syncSetStatus('Connected and signed in.',true);
 }
 async function syncSignOut(){
   if(syncClient) await syncClient.auth.signOut();
   syncUser=null;
   $('syncActions').style.display='none';
+  $('syncSignedInBadge').style.display='none';
+  $('syncLoginFields').style.display='block';
   syncSetStatus('Signed out.');
 }
 async function syncSaveCloud(){
@@ -483,6 +497,7 @@ async function syncSaveCloud(){
     territory:territory,
     dnw:dnw,
     dnw_names:dnwNames,
+    house_records:records,
     updated_at:new Date().toISOString()
   };
   const {data:existing,error:readError}=await syncClient
@@ -507,7 +522,7 @@ async function syncLoadCloud(){
   if(!syncClient||!syncUser){syncSetStatus('Please sign in first.');return}
   syncSetStatus('Loading map from cloud...');
   const {data,error}=await syncClient.from('territory_data')
-    .select('id,territory,dnw,dnw_names,updated_at')
+    .select('id,territory,dnw,dnw_names,house_records,updated_at')
     .eq('user_id',syncUser.id).order('updated_at',{ascending:false}).limit(1);
   if(error){syncSetStatus('Cloud load failed: '+error.message);return}
   if(!data||!data.length){syncSetStatus('No cloud map has been saved yet.');return}
@@ -519,6 +534,10 @@ async function syncLoadCloud(){
   dnwNames=Array.isArray(row.dnw_names)?row.dnw_names:[];
   while(dnwNames.length<dnw.length) dnwNames.push(`Do Not Work Area ${dnwNames.length+1}`);
   dnwNames=dnwNames.slice(0,dnw.length);
+  if(row.house_records && typeof row.house_records==='object' && !Array.isArray(row.house_records)){
+    records=row.house_records;
+    localStorage.setItem('tt_house_records_stable',JSON.stringify(records));
+  }
   localStorage.setItem('tt_geometry_stable',JSON.stringify({territory,dnw}));
   localStorage.setItem('tt_dnw_names_v1',JSON.stringify(dnwNames));
   localStorage.setItem('tt_last_cloud_sync',row.updated_at||new Date().toISOString());
